@@ -22,7 +22,7 @@
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left Panel: Configurations -->
+            <!-- Left Panel -->
             <div class="lg:col-span-2 space-y-6">
                 <!-- Destinations -->
                 <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
@@ -39,7 +39,7 @@
                     </div>
                 </div>
 
-                <!-- Overlays & Branding Control -->
+                <!-- Overlays -->
                 <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
                     <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-layer-group mr-2 text-purple-400"></i> Graphics & Overlay Settings</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -61,19 +61,16 @@
                     </div>
                 </div>
 
-                <!-- Video Scheduler & Queue -->
+                <!-- Video Scheduler -->
                 <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
                     <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-clock mr-2 text-emerald-400"></i> Video Scheduler & Automation</h2>
-                    
                     <div class="flex flex-col md:flex-row gap-2 mb-4">
                         <div class="flex-1">
-                            <input type="text" id="videoUrl" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="VPS Path (e.g. C:\live\videos\TestTrack1.mp4) or Direct MP4 Link">
+                            <input type="text" id="videoUrl" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="Local Path (e.g. C:\videos\Test.mp4)">
                         </div>
-
                         <input type="time" id="scheduleTime" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm">
                         <button onclick="addToSchedule()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium text-sm transition flex items-center justify-center"><i class="fa-solid fa-plus mr-1"></i> Add Item</button>
                     </div>
-                    
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm text-slate-400">
                             <thead class="bg-slate-900 text-slate-300">
@@ -91,7 +88,7 @@
                 </div>
             </div>
 
-            <!-- Right Panel: Controls -->
+            <!-- Right Panel -->
             <div class="space-y-6">
                 <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
                     <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-sliders mr-2 text-rose-400"></i> Broadcast Controls</h2>
@@ -101,7 +98,6 @@
                         <button onclick="triggerStream('stop')" class="w-full bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-lg font-bold text-sm transition shadow-lg"><i class="fa-solid fa-square mr-2"></i> Stop Stream</button>
                     </div>
                 </div>
-
                 <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 text-xs text-slate-400 space-y-2">
                     <p class="font-bold text-slate-200"><i class="fa-solid fa-circle-info mr-1 text-blue-400"></i> System Status:</p>
                     <p id="lastSync">Last Synced: Never</p>
@@ -121,7 +117,6 @@
             const statusEl = document.getElementById('connectionStatus');
             try {
                 const { data, error } = await _supabase.from('stream_config').select('*').eq('id', 1).maybeSingle();
-                
                 if (data) {
                     if (data.fb_key) document.getElementById('fbKey').value = data.fb_key;
                     if (data.yt_key) document.getElementById('ytKey').value = data.yt_key;
@@ -133,7 +128,6 @@
                         renderSchedule();
                     }
                 }
-
                 statusEl.className = "flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg text-sm border border-emerald-500/50 text-emerald-400";
                 statusEl.innerHTML = `<span class="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></span> Supabase Connected`;
             } catch (err) {
@@ -166,14 +160,12 @@
         function addToSchedule() {
             const videoSource = document.getElementById('videoUrl').value.trim();
             const time = document.getElementById('scheduleTime').value;
-
             if (!videoSource || !time) {
                 alert('مهرباني ڪري وڊيو پاٿ ۽ ٽائيم ٻئي داخل ڪريو.');
                 return;
             }
-
             scheduleItems.push({ time, url: videoSource });
-            document.getElementById('videoUrl').value = '';
+                document.getElementById('videoUrl').value = '';
             renderSchedule();
         }
 
