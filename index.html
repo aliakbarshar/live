@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stream Studio Pro v3.0 - Admin Control Center</title>
+    <title>Stream Studio Pro - Advance Control Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -13,8 +13,8 @@
         <!-- Header -->
         <header class="flex justify-between items-center mb-8 border-b border-slate-700 pb-4">
             <div>
-                <h1 class="text-3xl font-bold text-emerald-400"><i class="fa-solid fa-tower-broadcast mr-2"></i> Stream Studio Pro <span class="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-1 rounded">v3.0 Live</span></h1>
-                <p class="text-slate-400 text-sm">Advanced Multi-Stream & Playlist Control Center</p>
+                <h1 class="text-3xl font-bold text-emerald-400"><i class="fa-solid fa-tower-broadcast mr-2"></i> Stream Studio Pro <span class="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-1 rounded">v3.5 Live</span></h1>
+                <p class="text-slate-400 text-sm">Realtime Overlay, Logo & News Ticker Control Center</p>
             </div>
             <div id="connectionStatus" class="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg text-sm border border-slate-700">
                 <span class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></span> Connecting to Supabase...
@@ -26,81 +26,81 @@
             <div class="lg:col-span-2 space-y-6">
                 <!-- Destinations -->
                 <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
-                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-share-nodes mr-2 text-blue-400"></i> Streaming Destinations</h2>
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Facebook Stream Key</label>
-                            <input type="password" id="fbKey" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none" placeholder="FB-xxxxxxxxxxxxxx">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">YouTube Stream Key (Optional)</label>
-                            <input type="password" id="ytKey" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none" placeholder="xxxx-xxxx-xxxx-xxxx">
-                        </div>
+                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-share-nodes mr-2 text-blue-400"></i> Stream Destination</h2>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Facebook Stream Key</label>
+                        <input type="password" id="fbKey" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none" placeholder="FB-xxxxxxxxxxxxxx">
                     </div>
                 </div>
 
-                <!-- Overlays -->
+                <!-- Logo & Watermark Control -->
                 <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
-                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-layer-group mr-2 text-purple-400"></i> Graphics & Overlay Settings</h2>
+                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-image mr-2 text-purple-400"></i> Logo & Branding Control</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Channel Logo URL (PNG)</label>
-                            <input type="text" id="logoUrl" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="https://domain.com/logo.png">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium mb-1">Logo URL / Local File Path</label>
+                            <input type="text" id="logoUrl" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="e.g. C:/logo.png or https://site.com/logo.png">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-1">Overlay Position</label>
+                            <label class="block text-sm font-medium mb-1">Logo Position</label>
                             <select id="logoPos" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm">
-                                <option value="top-right">Top Right (Default)</option>
-                                <option value="top-left">Top Left</option>
+                                <option value="top-right">Top Right (مٿي ساڄي)</option>
+                                <option value="top-left">Top Left (مٿي ٻائي)</option>
+                                <option value="bottom-right">Bottom Right (هيٺ ساڄي)</option>
+                                <option value="bottom-left">Bottom Left (هيٺ ٻائي)</option>
                             </select>
                         </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-sm font-medium mb-1">Ticker / Breaking News Text</label>
-                            <input type="text" id="tickerText" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="Enter marquee headlines to scroll continuously...">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Logo Size (Pixels)</label>
+                            <input type="number" id="logoSize" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" value="120" placeholder="Default 120px">
                         </div>
                     </div>
                 </div>
 
-                <!-- Video Scheduler -->
+                <!-- Heading & Clock Controls -->
                 <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
-                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-clock mr-2 text-emerald-400"></i> Video Scheduler & Automation</h2>
-                    <div class="flex flex-col md:flex-row gap-2 mb-4">
-                        <div class="flex-1">
-                            <input type="text" id="videoUrl" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="Local Path (e.g. C:\videos\Test.mp4)">
+                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-newspaper mr-2 text-amber-400"></i> Headline & Clock Settings</h2>
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-4">
+                            <input type="checkbox" id="showClock" class="w-5 h-5 accent-emerald-500 rounded">
+                            <label for="showClock" class="text-sm font-medium">Show Live Digital Clock on Video (وڊيو تي لائيو ٽائيم ڏيکاريو)</label>
                         </div>
-                        <input type="time" id="scheduleTime" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm">
-                        <button onclick="addToSchedule()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium text-sm transition flex items-center justify-center"><i class="fa-solid fa-plus mr-1"></i> Add Item</button>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Breaking News / Scroll Ticker Header</label>
+                            <input type="text" id="tickerText" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="هتي پنهنجي نيوز جي هئڊنگ يا پٽي لکو...">
+                        </div>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm text-slate-400">
-                            <thead class="bg-slate-900 text-slate-300">
-                                <tr>
-                                    <th class="p-2">Time</th>
-                                    <th class="p-2">Source / Video Path</th>
-                                    <th class="p-2">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="scheduleList">
-                                <tr><td colspan="3" class="p-4 text-center text-slate-500">No scheduled videos added yet.</td></tr>
-                            </tbody>
-                        </table>
+                </div>
+
+                <!-- Video Playlist -->
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
+                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-film mr-2 text-emerald-400"></i> Local Video Scheduler</h2>
+                    <div class="flex flex-col md:flex-row gap-2 mb-4">
+                        <input type="text" id="videoUrl" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="e.g. C:/TestTrack1.mp4">
+                        <button onclick="addToSchedule()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium text-sm"><i class="fa-solid fa-plus mr-1"></i> Add Video</button>
                     </div>
+                    <table class="w-full text-left text-sm text-slate-400">
+                        <thead class="bg-slate-900 text-slate-300">
+                            <tr><th class="p-2">Video Path</th><th class="p-2">Action</th></tr>
+                        </thead>
+                        <tbody id="scheduleList"></tbody>
+                    </table>
                 </div>
             </div>
 
-            <!-- Right Panel -->
+            <!-- Right Panel Controls -->
             <div class="space-y-6">
-                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
-                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-sliders mr-2 text-rose-400"></i> Broadcast Controls</h2>
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl sticky top-6">
+                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-sliders mr-2 text-rose-400"></i> Quick Actions</h2>
                     <div class="space-y-3">
-                        <button onclick="updateSettings()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-bold text-sm transition shadow-lg"><i class="fa-solid fa-floppy-disk mr-2"></i> Save & Sync All Settings</button>
-                        <button onclick="triggerStream('start')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold text-sm transition shadow-lg"><i class="fa-solid fa-play mr-2"></i> Start Broadcaster</button>
-                        <button onclick="triggerStream('stop')" class="w-full bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-lg font-bold text-sm transition shadow-lg"><i class="fa-solid fa-square mr-2"></i> Stop Stream</button>
+                        <button onclick="updateSettings()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-bold text-sm transition"><i class="fa-solid fa-floppy-disk mr-2"></i> Save & Apply Settings</button>
+                        <button onclick="triggerStream('start')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold text-sm transition"><i class="fa-solid fa-play mr-2"></i> Start Broadcaster</button>
+                        <button onclick="triggerStream('stop')" class="w-full bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-lg font-bold text-sm transition"><i class="fa-solid fa-square mr-2"></i> Stop Stream</button>
                     </div>
-                </div>
-                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 text-xs text-slate-400 space-y-2">
-                    <p class="font-bold text-slate-200"><i class="fa-solid fa-circle-info mr-1 text-blue-400"></i> System Status:</p>
-                    <p id="lastSync">Last Synced: Never</p>
+                    <div class="mt-6 p-4 bg-slate-900 rounded-lg text-xs text-slate-400">
+                        <p class="font-bold text-slate-200 mb-1"><i class="fa-solid fa-info-circle mr-1"></i> Note:</p>
+                        <p>لوگو، ٽائيم يا هيڊنگ ۾ تبديلي ڪرڻ بعد **Save & Apply** بٽڻ دٻايو ۽ اسٽريم کي ٻيهر اسٽارٽ ڪريو.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -109,93 +109,59 @@
     <script>
         const SUPABASE_URL = "https://meywyyvqmrnpbzrzzhvm.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI";
-        
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         let scheduleItems = [];
 
         async function init() {
-            const statusEl = document.getElementById('connectionStatus');
-            try {
-                const { data, error } = await _supabase.from('stream_config').select('*').eq('id', 1).maybeSingle();
-                if (data) {
-                    if (data.fb_key) document.getElementById('fbKey').value = data.fb_key;
-                    if (data.yt_key) document.getElementById('ytKey').value = data.yt_key;
-                    if (data.logo_url) document.getElementById('logoUrl').value = data.logo_url;
-                    if (data.logo_pos) document.getElementById('logoPos').value = data.logo_pos;
-                    if (data.ticker_text) document.getElementById('tickerText').value = data.ticker_text;
-                    if (data.playlist) {
-                        scheduleItems = data.playlist;
-                        renderSchedule();
-                    }
-                }
-                statusEl.className = "flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg text-sm border border-emerald-500/50 text-emerald-400";
-                statusEl.innerHTML = `<span class="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></span> Supabase Connected`;
-            } catch (err) {
-                statusEl.className = "flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg text-sm border border-rose-500/50 text-rose-400";
-                statusEl.innerHTML = `<span class="w-3 h-3 rounded-full bg-rose-500"></span> Connection Error`;
+            const { data } = await _supabase.from('stream_config').select('*').eq('id', 1).maybeSingle();
+            if (data) {
+                if (data.fb_key) document.getElementById('fbKey').value = data.fb_key;
+                if (data.logo_url) document.getElementById('logoUrl').value = data.logo_url;
+                if (data.logo_pos) document.getElementById('logoPos').value = data.logo_pos;
+                if (data.logo_size) document.getElementById('logoSize').value = data.logo_size;
+                if (data.ticker_text) document.getElementById('tickerText').value = data.ticker_text;
+                if (data.show_clock !== undefined) document.getElementById('showClock').checked = data.show_clock;
+                if (data.playlist) { scheduleItems = data.playlist; renderSchedule(); }
             }
+            document.getElementById('connectionStatus').innerHTML = `<span class="w-3 h-3 rounded-full bg-emerald-500"></span> Connected`;
         }
 
         async function updateSettings() {
             const payload = {
                 id: 1,
                 fb_key: document.getElementById('fbKey').value,
-                yt_key: document.getElementById('ytKey').value,
                 logo_url: document.getElementById('logoUrl').value,
                 logo_pos: document.getElementById('logoPos').value,
+                logo_size: parseInt(document.getElementById('logoSize').value) || 120,
                 ticker_text: document.getElementById('tickerText').value,
+                show_clock: document.getElementById('showClock').checked,
                 playlist: scheduleItems,
                 updated_at: new Date()
             };
-            
             const { error } = await _supabase.from('stream_config').upsert(payload);
-            if (!error) {
-                document.getElementById('lastSync').innerText = "Last Synced: " + new Date().toLocaleTimeString();
-                alert('سيٽنگز ۽ پلي لسٽ ڪاميابي سان سيِو ٿي ويا!');
-            } else {
-                alert('ايرر: ' + error.message);
-            }
+            if (!error) alert('سيٽنگز ۽ اوورلي ڪاميابي سان مڪمل سيِو ٿي ويا!');
+            else alert('ايرر: ' + error.message);
         }
 
         function addToSchedule() {
-            const videoSource = document.getElementById('videoUrl').value.trim();
-            const time = document.getElementById('scheduleTime').value;
-            if (!videoSource || !time) {
-                alert('مهرباني ڪري وڊيو پاٿ ۽ ٽائيم ٻئي داخل ڪريو.');
-                return;
-            }
-            scheduleItems.push({ time, url: videoSource });
-                document.getElementById('videoUrl').value = '';
-            renderSchedule();
+            const url = document.getElementById('videoUrl').value.trim();
+            if (url) { scheduleItems.push({ url }); renderSchedule(); document.getElementById('videoUrl').value = ''; }
         }
 
-        function removeItem(index) {
-            scheduleItems.splice(index, 1);
-            renderSchedule();
-        }
+        function removeItem(idx) { scheduleItems.splice(idx, 1); renderSchedule(); }
 
         function renderSchedule() {
-            const tbody = document.getElementById('scheduleList');
-            if(scheduleItems.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-500">No scheduled videos added yet.</td></tr>`;
-                return;
-            }
-            tbody.innerHTML = scheduleItems.map((item, idx) => `
+            document.getElementById('scheduleList').innerHTML = scheduleItems.map((item, idx) => `
                 <tr class="border-t border-slate-700">
-                    <td class="p-2 text-emerald-400 font-mono">${item.time}</td>
-                    <td class="p-2 truncate max-w-xs text-slate-300">${item.url}</td>
-                    <td class="p-2"><button onclick="removeItem(${idx})" class="text-rose-400 hover:text-rose-300"><i class="fa-solid fa-trash"></i></button></td>
+                    <td class="p-2 truncate text-slate-300">${item.url}</td>
+                    <td class="p-2"><button onclick="removeItem(${idx})" class="text-rose-400"><i class="fa-solid fa-trash"></i></button></td>
                 </tr>
             `).join('');
         }
 
         async function triggerStream(action) {
-            const { error } = await _supabase.from('stream_commands').insert([{ command: action, timestamp: new Date() }]);
-            if(!error) {
-                alert(`ڪمانڊ '${action}' موڪلي وئي!`);
-            } else {
-                alert('ايرر: ' + error.message);
-            }
+            await _supabase.from('stream_commands').insert([{ command: action, timestamp: new Date() }]);
+            alert(`ڪمانڊ '${action}' موڪلي وئي!`);
         }
 
         window.onload = init;
