@@ -2,8 +2,8 @@ const { createClient } = require('@supabase/supabase-js');
 const { spawn, exec } = require('child_process');
 const cron = require('node-cron');
 
-const SUPABASE_URL = "https://YOUR_SUPABASE_PROJECT.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://meywyyvqmrnpbzrzzhvm.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let ffmpegProcess = null;
