@@ -67,10 +67,9 @@
                     <div class="flex gap-2 mb-4">
                         <input type="text" id="videoUrl" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="Video Path or Direct MP4 Link">
                         <input type="time" id="scheduleTime" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm">
-                        <button onclick="addToSchedule()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium text-sm transition"><i class="fa-solid fa-plus mr-1"></i> Schedule</button>
+                        <button onclick="addToSchedule()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium text-sm transition"><i class="fa-solid fa-plus mr-1"></i> Add Item</button>
                     </div>
                     
-                    <!-- Scheduled Queue Table -->
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm text-slate-400">
                             <thead class="bg-slate-900 text-slate-300">
@@ -81,16 +80,15 @@
                                 </tr>
                             </thead>
                             <tbody id="scheduleList">
-                                <!-- Dynamic Items -->
+                                <tr><td colspan="3" class="p-4 text-center text-slate-500">No scheduled videos added yet.</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Panel: Controls & Preview -->
+            <!-- Right Panel: Controls -->
             <div class="space-y-6">
-                <!-- Master Actions -->
                 <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
                     <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-sliders mr-2 text-rose-400"></i> Broadcast Controls</h2>
                     <div class="space-y-3">
@@ -100,52 +98,107 @@
                     </div>
                 </div>
 
-                <!-- Info Guide -->
                 <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 text-xs text-slate-400 space-y-2">
-                    <p class="font-bold text-slate-200"><i class="fa-solid fa-circle-info mr-1 text-blue-400"></i> Features Integrated:</p>
-                    <ul class="list-disc pl-4 space-y-1">
-                        <li>Automatic Live Clock Overlay</li>
-                        <li>Dynamic Logo Sticking</li>
-                        <li>Scheduled Video Queue Execution</li>
-                        <li>Realtime FFmpeg Render Engine Engine</li>
-                    </ul>
+                    <p class="font-bold text-slate-200"><i class="fa-solid fa-circle-info mr-1 text-blue-400"></i> System Status:</p>
+                    <p id="lastSync">Last Synced: Never</p>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Initialize Supabase
         const SUPABASE_URL = "https://meywyyvqmrnpbzrzzhvm.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI";
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Fixed client initialization
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let scheduleItems = [];
 
-        // Realtime Subscription
         async function init() {
             const statusEl = document.getElementById('connectionStatus');
-            statusEl.innerHTML = `<span class="w-3 h-3 rounded-full bg-emerald-500"></span> Supabase Realtime: Connected`;
+            try {
+                // Fetch Existing Config
+                const { data, error } = await _supabase.from('stream_config').select('*').eq('id', 1).single();
+                
+                if (data) {
+                    if (data.fb_key) document.getElementById('fbKey').value = data.fb_key;
+                    if (data.yt_key) document.getElementById('ytKey').value = data.yt_key;
+                    if (data.logo_url) document.getElementById('logoUrl').value = data.logo_url;
+                    if (data.logo_pos) document.getElementById('logoPos').value = data.logo_pos;
+                    if (data.ticker_text) document.getElementById('tickerText').value = data.ticker_text;
+                    if (data.playlist) {
+                        scheduleItems = data.playlist;
+                        renderSchedule();
+                    }
+                }
+
+                statusEl.className = "flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg text-sm border border-emerald-500/50 text-emerald-400";
+                statusEl.innerHTML = `<span class="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></span> Supabase Connected`;
+            } catch (err) {
+                statusEl.className = "flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg text-sm border border-rose-500/50 text-rose-400";
+                statusEl.innerHTML = `<span class="w-3 h-3 rounded-full bg-rose-500"></span> Connection Error`;
+            }
         }
-        
+
         async function updateSettings() {
             const payload = {
+                id: 1,
                 fb_key: document.getElementById('fbKey').value,
                 yt_key: document.getElementById('ytKey').value,
                 logo_url: document.getElementById('logoUrl').value,
                 logo_pos: document.getElementById('logoPos').value,
                 ticker_text: document.getElementById('tickerText').value,
+                playlist: scheduleItems,
                 updated_at: new Date()
             };
             
-            const { data, error } = await supabase.from('stream_config').upsert({ id: 1, ...payload });
-            if (!error) alert('Settings saved and synchronized with VPS!');
+            const { error } = await _supabase.from('stream_config').upsert(payload);
+            if (!error) {
+                document.getElementById('lastSync').innerText = "Last Synced: " + new Date().toLocaleTimeString();
+                alert('سیٽنگز ۽ پلي لسٽ Supabase تي ڪاميابي سان اپڊيٽ ٿي وئي!');
+            } else {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function addToSchedule() {
+            const url = document.getElementById('videoUrl').value;
+            const time = document.getElementById('scheduleTime').value;
+            if(!url || !time) {
+                alert('مهرباني ڪري وڊيو لنڪ ۽ ٽائيم ٻئي داخل ڪريو.');
+                return;
+            }
+            scheduleItems.push({ time, url });
+            document.getElementById('videoUrl').value = '';
+            renderSchedule();
+        }
+
+        function removeItem(index) {
+            scheduleItems.splice(index, 1);
+            renderSchedule();
+        }
+
+        function renderSchedule() {
+            const tbody = document.getElementById('scheduleList');
+            if(scheduleItems.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-500">No scheduled videos added yet.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = scheduleItems.map((item, idx) => `
+                <tr class="border-t border-slate-700">
+                    <td class="p-2 text-emerald-400 font-mono">${item.time}</td>
+                    <td class="p-2 truncate max-w-xs text-slate-300">${item.url}</td>
+                    <td class="p-2"><button onclick="removeItem(${idx})" class="text-rose-400 hover:text-rose-300"><i class="fa-solid fa-trash"></i></button></td>
+                </tr>
+            `).join('');
         }
 
         async function triggerStream(action) {
-            await supabase.from('stream_commands').insert([{ command: action, timestamp: new Date() }]);
-            alert(`Command '${action}' sent to VPS Runner.`);
+            const { error } = await _supabase.from('stream_commands').insert([{ command: action, timestamp: new Date() }]);
+            if(!error) alert(`ڪمانڊ '${action}' موفقانه موڪلي وئي!`);
         }
 
-        init();
+        window.onload = init;
     </script>
 </body>
 </html>
