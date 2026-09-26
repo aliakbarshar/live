@@ -1,6 +1,6 @@
 {
-  "name": "stream-studio-pro",
-  "version": "3.0.0",
+  "name": "live-stream-engine",
+  "version": "1.0.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
