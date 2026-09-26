@@ -1,0 +1,137 @@
+<!DOCTYPE1 html>
+<html lang="sd" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Control Room - Admin Portal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Nastaliq Urdu', sans-serif, system-ui; }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto space-y-6">
+        <!-- Header -->
+        <header class="flex justify-between items-center bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+            <div>
+                <h1 class="text-2xl font-bold text-emerald-400">لائيو اسٽريم ڪنٽرول روم</h1>
+                <p class="text-slate-400 text-sm">يوٽيوب ۽ فيس بڪ برائراست نشريات انتظاميا</p>
+            </div>
+            <div id="statusBadge" class="px-4 py-2 rounded-full text-xs font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                ● اسٽريم آف لائن
+            </div>
+        </header>
+
+        <!-- Main Form Controls -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <!-- Left Side Controls -->
+            <div class="md:col-span-2 bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-5">
+                <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">اسٽريم اوورلي سيٽنگز</h2>
+
+                <!-- Main Heading -->
+                <div>
+                    <label class="block text-slate-300 text-sm mb-2">مين هيڊنگ / چينل جو نالو</label>
+                    <input type="text" id="channelTitle" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition">
+                </div>
+
+                <!-- Running Ticker -->
+                <div>
+                    <label class="block text-slate-300 text-sm mb-2">رننگ ٽيڪر / پٽي (Ticker Text)</label>
+                    <textarea id="runningTicker" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition"></textarea>
+                </div>
+
+                <!-- Logo URL -->
+                <div>
+                    <label class="block text-slate-300 text-sm mb-2">لوگو لنڪ (Direct Image URL)</label>
+                    <input type="text" id="logoUrl" placeholder="https://example.com/logo.png" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition">
+                </div>
+
+                <!-- Action Button -->
+                <button onclick="updateSettings()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition duration-200 shadow-lg shadow-emerald-600/20">
+                    سیٹنگز اپڊيٽ ڪريو (Update Stream)
+                </button>
+            </div>
+
+            <!-- Right Side Live Preview Box -->
+            <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-4">
+                <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">لائيو پريويو (Preview)</h2>
+                
+                <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-slate-700 flex flex-col justify-between p-3">
+                    <!-- Top Logo Preview -->
+                    <div class="flex justify-between items-start">
+                        <span id="previewHeading" class="bg-emerald-600 text-white text-xs px-2 py-1 rounded">--</span>
+                        <img id="previewLogo" src="https://via.placeholder.com/40" class="w-8 h-8 rounded-full border border-white/20 object-cover" alt="Logo">
+                    </div>
+
+                    <!-- Bottom Ticker Preview -->
+                    <div class="bg-red-600/90 text-white text-xs px-2 py-1 truncate">
+                        <span id="previewTicker">ٽيڪر پريويو...</span>
+                    </div>
+                </div>
+
+                <p class="text-xs text-slate-400">هي اوورلي سڌو سنئون توهان جي لائيو اسٽريم تي ريل ٽائيم ۾ شو ٿيندو.</p>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Initialize Supabase
+        const SUPABASE_URL = "YOUR_SUPABASE_URL";
+        const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY";
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Fetch Initial Data
+        async function loadSettings() {
+            let { data, error } = await supabase
+                .from('stream_settings')
+                .select('*')
+                .eq('id', 1)
+                .single();
+
+            if (data) {
+                document.getElementById('channelTitle').value = data.channel_title || '';
+                document.getElementById('runningTicker').value = data.running_ticker || '';
+                document.getElementById('logoUrl').value = data.logo_url || '';
+
+                // Update Preview
+                document.getElementById('previewHeading').innerText = data.channel_title;
+                document.getElementById('previewTicker').innerText = data.running_ticker;
+                if(data.logo_url) document.getElementById('previewLogo').src = data.logo_url;
+            }
+        }
+
+        // Update Settings Function
+        async function updateSettings() {
+            const title = document.getElementById('channelTitle').value;
+            const ticker = document.getElementById('runningTicker').value;
+            const logo = document.getElementById('logoUrl').value;
+
+            const { data, error } = await supabase
+                .from('stream_settings')
+                .update({ 
+                    channel_title: title, 
+                    running_ticker: ticker, 
+                    logo_url: logo,
+                    updated_at: new Date()
+                })
+                .eq('id', 1);
+
+            if (error) {
+                alert('غلطي: سيٽنگز اپڊيٽ نه ٿي سگهيون.');
+            } else {
+                alert('مبارڪون! لائيو سيٽنگز اپڊيٽ ٿي ويون آهن.');
+                loadSettings();
+            }
+        }
+
+        loadSettings();
+    </script>
+</body>
+</html>
