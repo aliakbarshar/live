@@ -16,7 +16,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let ffmpegProcess = null;
 
-console.log(`🚀 Stream Studio Engine Running on http://localhost:${PORT}`);
+console.log(`🚀 Stream Studio Cloud Engine Running on http://localhost:${PORT}`);
 
 supabase
   .channel('stream_commands')
@@ -37,22 +37,20 @@ async function startBroadcaster() {
     return;
   }
 
-  // Generate Playlist
-  const listFilePath = path.join(__dirname, 'playlist.txt');
-  let fileContent = config.playlist.map(item => `file '${item.url.replace(/'/g, "'\\''")}'`).join('\n');
-  fs.writeFileSync(listFilePath, fileContent);
-
+  const firstVideoUrl = config.playlist[0].url;
   const rtmpsUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${config.fb_key}`;
 
-  // Advance Filters Setup (Logo, Clock, News Ticker)
+  console.log(`🌐 Stream Processing Target: ${firstVideoUrl}`);
+
+  // Graphics Overlays Filters Setup
   let filters = [];
   let currentStream = '[0:v]';
 
-  // 1. Logo Processing
+  // 1. Logo Overlay
   const hasLogo = config.logo_url && config.logo_url.trim() !== '';
   if (hasLogo) {
     const size = config.logo_size || 120;
-    let pos = 'x=main_w-overlay_w-20:y=20'; // Top Right
+    let pos = 'x=main_w-overlay_w-20:y=20';
     if (config.logo_pos === 'top-left') pos = 'x=20:y=20';
     if (config.logo_pos === 'bottom-right') pos = 'x=main_w-overlay_w-20:y=main_h-overlay_h-70';
     if (config.logo_pos === 'bottom-left') pos = 'x=20:y=main_h-overlay_h-70';
@@ -62,14 +60,14 @@ async function startBroadcaster() {
     currentStream = '[v_logo]';
   }
 
-  // 2. Live Clock Processing
+  // 2. Digital Clock
   if (config.show_clock) {
     const clockFilter = `${currentStream}drawtext=text='%{localtime\\:%I\\:%M\\:%S %p}':fontcolor=white:fontsize=22:box=1:boxcolor=black@0.6:boxborderw=6:x=w-tw-20:y=h-40[v_clock]`;
     filters.push(clockFilter);
     currentStream = '[v_clock]';
   }
 
-  // 3. Scrolling Ticker Processing
+  // 3. News Ticker Header
   if (config.ticker_text && config.ticker_text.trim() !== '') {
     const tickerEscaped = config.ticker_text.replace(/:/g, '\\:').replace(/'/g, '');
     const tickerFilter = `${currentStream}drawtext=text='${tickerEscaped}':fontcolor=white:fontsize=24:box=1:boxcolor=red@0.8:boxborderw=10:x=w-mod(max_t*120\\,w+tw):y=h-40[v_final]`;
@@ -77,7 +75,12 @@ async function startBroadcaster() {
     currentStream = '[v_final]';
   }
 
-  let ffmpegArgs = ['-re', '-f', 'concat', '-safe', '0', '-stream_loop', '-1', '-i', listFilePath];
+  // FFmpeg Command Construction for HTTP / Cloud File Input
+  let ffmpegArgs = [
+    '-re',
+    '-stream_loop', '-1', // وڊيو ختم ٿيڻ تي خودبخود موٽي هلي
+    '-i', firstVideoUrl
+  ];
 
   if (hasLogo) ffmpegArgs.push('-i', config.logo_url);
 
@@ -94,15 +97,27 @@ async function startBroadcaster() {
     '-f', 'flv', rtmpsUrl
   );
 
+  console.log("🎬 Cloud Stream Engine Broadcaster Launched!");
   ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
-  console.log("🎬 Live Broadcast Started with Custom Graphics!");
+
+  ffmpegProcess.stderr.on('data', (data) => {
+    const str = data.toString();
+    if (str.includes('frame=')) {
+      process.stdout.write(`📡 Live Stream Speed Progress: ${str.trim()}\r`);
+    }
+  });
+
+  ffmpegProcess.on('close', (code) => {
+    console.log(`\n🔴 Broadcaster Stopped: code ${code}`);
+    ffmpegProcess = null;
+  });
 }
 
 function stopBroadcaster() {
   if (ffmpegProcess) {
     ffmpegProcess.kill('SIGKILL');
     ffmpegProcess = null;
-    console.log("🛑 Broadcast Stopped.");
+    console.log("🛑 Broadcast Stopped Successfully.");
   }
 }
 
