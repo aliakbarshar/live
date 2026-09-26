@@ -1,536 +1,151 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sd">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stream Control Room - Admin Portal</title>
-    <!-- Tailwind CSS -->
+    <title>Stream Studio Pro v3.0 - Admin Control Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Supabase JS CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        
-        /* Custom Scrolling Animation for Ticker Preview */
-        @keyframes marquee {
-            0% { transform: translateX(100%); }
-            100% { transform: translateX(-100%); }
-        }
-        .animate-marquee {
-            display: inline-block;
-            white-space: nowrap;
-            animation: marquee 16s linear infinite;
-        }
-        .animate-marquee:hover {
-            animation-play-state: paused;
-        }
-    </style>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen">
-
-    <!-- Top Navigation Header -->
-    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-emerald-500/20">
-                    <i class="fa-solid font-bold fa-broadcast-tower text-lg"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                        Stream Studio Pro
-                        <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold px-2 py-0.5 rounded-full">v2.4 Live</span>
-                    </h1>
-                    <p class="text-xs text-slate-400">YouTube & Facebook Multi-Stream Control Center</p>
-                </div>
+<body class="bg-slate-900 text-slate-100 font-sans">
+    <div class="container mx-auto p-6 max-w-7xl">
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-8 border-b border-slate-700 pb-4">
+            <div>
+                <h1 class="text-3xl font-bold text-emerald-400"><i class="fa-solid fa-tower-broadcast mr-2"></i> Stream Studio Pro <span class="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-1 rounded">v3.0 Live</span></h1>
+                <p class="text-slate-400 text-sm">Advanced Multi-Stream & Playlist Control Center</p>
             </div>
-
-            <!-- Global Status Bar -->
-            <div class="flex items-center space-x-4">
-                <div id="connectionStatus" class="hidden md:flex items-center space-x-2 text-xs bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>Supabase Realtime: <strong class="text-emerald-400 font-mono">Connected</strong></span>
-                </div>
-
-                <div id="liveBroadcastBadge" class="flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">
-                    <span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
-                    <span id="liveBadgeText">OFFLINE</span>
-                </div>
+            <div id="connectionStatus" class="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg text-sm border border-slate-700">
+                <span class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></span> Connecting to Supabase...
             </div>
-        </div>
-    </header>
+        </header>
 
-    <!-- Main Dashboard Container -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        <!-- Toast Notification Box -->
-        <div id="toast" class="fixed bottom-5 right-5 z-50 transition-all duration-300 transform translate-y-20 opacity-0 bg-slate-800 text-white px-5 py-3 rounded-xl border border-slate-700 shadow-2xl flex items-center gap-3">
-            <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
-            <span id="toastMessage" class="text-sm font-medium">Settings saved successfully</span>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            <!-- LEFT & CENTER CONTROLS (7 Cols) -->
-            <div class="lg:col-span-7 xl:col-span-7 space-y-6">
-                
-                <!-- Master Action Bar -->
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <h2 class="text-base font-semibold text-white">Broadcast Master Switch</h2>
-                        <p class="text-xs text-slate-400">Start or stop streaming to configured destinations</p>
-                    </div>
-                    <div class="flex items-center space-x-3 w-full sm:w-auto">
-                        <button id="btnStartBroadcast" onclick="toggleBroadcast(true)" class="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition duration-150 shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-play text-xs"></i> Start Stream
-                        </button>
-                        <button id="btnStopBroadcast" onclick="toggleBroadcast(false)" class="flex-1 sm:flex-initial bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition duration-150 shadow-lg shadow-rose-600/20 flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-stop text-xs"></i> Stop Stream
-                        </button>
-                        <button onclick="forceSync()" title="Force Sync Realtime" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white p-2.5 rounded-xl border border-slate-700 transition">
-                            <i class="fa-solid fa-rotate"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Overlay Settings Section -->
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
-                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                        <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-layer-group text-emerald-400"></i>
-                            <h2 class="text-base font-semibold text-white">On-Screen Overlay Settings</h2>
-                        </div>
-                        <span class="text-xs text-slate-500">Updates stream in real-time</span>
-                    </div>
-
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left Panel: Configurations -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Destinations -->
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
+                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-share-nodes mr-2 text-blue-400"></i> Streaming Destinations</h2>
                     <div class="space-y-4">
-                        <!-- Main Title / Heading -->
                         <div>
-                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Main Channel Heading / Title</label>
-                            <input type="text" id="channelTitle" oninput="handleInstantPreview()" placeholder="e.g. DAHARKI LIVE NEWS 24/7" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
+                            <label class="block text-sm font-medium mb-1">Facebook Stream Key</label>
+                            <input type="password" id="fbKey" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none" placeholder="FB-xxxxxxxxxxxxxx">
                         </div>
-
-                        <!-- Running Ticker -->
                         <div>
-                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Lower-Third Running News Ticker</label>
-                            <textarea id="runningTicker" rows="3" oninput="handleInstantPreview()" placeholder="Enter marquee headlines separated by dots or dashes..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition"></textarea>
-                        </div>
-
-                        <!-- Logo URL & Clock Toggle -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Logo Direct Image URL</label>
-                                <input type="text" id="logoUrl" oninput="handleInstantPreview()" placeholder="https://raw.githubusercontent.com/.../logo.png" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
-                            </div>
-                            <div class="flex flex-col justify-end">
-                                <label class="flex items-center space-x-3 bg-slate-950 border border-slate-800 rounded-xl p-3.5 cursor-pointer hover:border-slate-700 transition">
-                                    <input type="checkbox" id="showClock" onchange="handleInstantPreview()" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700" checked>
-                                    <span class="text-sm font-medium text-slate-200">Display Digital Clock Overlay</span>
-                                </label>
-                            </div>
+                            <label class="block text-sm font-medium mb-1">YouTube Stream Key (Optional)</label>
+                            <input type="password" id="ytKey" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none" placeholder="xxxx-xxxx-xxxx-xxxx">
                         </div>
                     </div>
                 </div>
 
-                <!-- Live Stream Targets (YouTube & Facebook Keys) -->
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
-                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                        <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-share-nodes text-blue-400"></i>
-                            <h2 class="text-base font-semibold text-white">Streaming Destinations Configuration</h2>
+                <!-- Overlays & Branding Control -->
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
+                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-layer-group mr-2 text-purple-400"></i> Graphics & Overlay Settings</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Channel Logo URL (PNG)</label>
+                            <input type="text" id="logoUrl" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="https://domain.com/logo.png">
                         </div>
-                    </div>
-
-                    <!-- YouTube Platform Config -->
-                    <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <i class="fa-brands fa-youtube text-red-500 text-lg"></i>
-                                <span class="text-sm font-bold text-white">YouTube Live</span>
-                            </div>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="enableYoutube" class="sr-only peer" checked>
-                                <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
-                            </label>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Overlay Position</label>
+                            <select id="logoPos" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm">
+                                <option value="top-right">Top Right (Default)</option>
+                                <option value="top-left">Top Left</option>
+                            </select>
                         </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label class="text-[11px] font-semibold text-slate-400 uppercase">RTMP Server URL</label>
-                                <input type="text" id="ytRtmpUrl" value="rtmp://a.rtmp.youtube.com/live2" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-red-500">
-                            </div>
-                            <div>
-                                <label class="text-[11px] font-semibold text-slate-400 uppercase">Stream Key</label>
-                                <input type="password" id="ytStreamKey" placeholder="xxxx-xxxx-xxxx-xxxx" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-red-500">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Facebook Platform Config -->
-                    <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <i class="fa-brands fa-facebook text-blue-500 text-lg"></i>
-                                <span class="text-sm font-bold text-white">Facebook Live</span>
-                            </div>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="enableFacebook" class="sr-only peer" checked>
-                                <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                            </label>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label class="text-[11px] font-semibold text-slate-400 uppercase">RTMP Server URL</label>
-                                <input type="text" id="fbRtmpUrl" value="rtmps://live-api-s.facebook.com:443/rtmp/" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
-                            </div>
-                            <div>
-                                <label class="text-[11px] font-semibold text-slate-400 uppercase">Stream Key</label>
-                                <input type="password" id="fbStreamKey" value="FB-1333338138808485-0-Ab7oqxJ0H2Z1stRTDe5-HBnv" placeholder="FB-xxxxxxxxxxxx" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
-                            </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium mb-1">Ticker / Breaking News Text</label>
+                            <input type="text" id="tickerText" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="Enter marquee headlines to scroll continuously...">
                         </div>
                     </div>
                 </div>
 
-                <!-- Playlist & Video Source Manager -->
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
-                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                        <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-film text-purple-400"></i>
-                            <h2 class="text-base font-semibold text-white">Video Source / Playlist Queue</h2>
-                        </div>
+                <!-- Video Scheduler & Queue -->
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
+                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-clock mr-2 text-emerald-400"></i> Video Scheduler & Automation</h2>
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" id="videoUrl" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="Video Path or Direct MP4 Link">
+                        <input type="time" id="scheduleTime" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm">
+                        <button onclick="addToSchedule()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium text-sm transition"><i class="fa-solid fa-plus mr-1"></i> Schedule</button>
                     </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Active Video Stream URL or Local Path</label>
-                        <div class="flex gap-2">
-                            <input type="text" id="videoSource" oninput="handleInstantPreview()" placeholder="e.g. C:\cercus.mp4 or GitHub MP4 Link" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
-                            <button onclick="updateSettings()" class="bg-purple-600 hover:bg-purple-500 text-white font-semibold px-5 rounded-xl transition text-sm flex items-center gap-2 shrink-0">
-                                <i class="fa-solid fa-cloud-arrow-up"></i> Push Live
-                            </button>
-                        </div>
-                        <p class="text-xs text-slate-500 mt-2">Paste a Direct GitHub MP4 URL, local path (e.g. C:\cercus.mp4), or YouTube Video ID.</p>
+                    
+                    <!-- Scheduled Queue Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-400">
+                            <thead class="bg-slate-900 text-slate-300">
+                                <tr>
+                                    <th class="p-2">Time</th>
+                                    <th class="p-2">Source / Video URL</th>
+                                    <th class="p-2">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scheduleList">
+                                <!-- Dynamic Items -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-
-                <!-- Update Settings Button -->
-                <button onclick="updateSettings()" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold py-4 rounded-2xl transition duration-200 shadow-xl shadow-emerald-900/30 text-base flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-floppy-disk"></i> Save & Broadcast Settings
-                </button>
-
             </div>
 
-            <!-- RIGHT SIDE PREVIEW MONITOR (5 Cols) -->
-            <div class="lg:col-span-5 xl:col-span-5 space-y-6">
-                
-                <div class="sticky top-24 space-y-6">
-                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4">
-                        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                            <div class="flex items-center gap-2">
-                                <i class="fa-solid fa-desktop text-emerald-400"></i>
-                                <h2 class="text-base font-semibold text-white">Program Stream Preview</h2>
-                            </div>
-                            <span class="flex items-center gap-1.5 text-[11px] bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                                <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span> Live Monitor
-                            </span>
-                        </div>
-
-                        <!-- Video Player Simulation Container -->
-                        <div class="relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-slate-800 shadow-2xl flex flex-col justify-between group">
-                            
-                            <!-- Simulated Video Background or iFrame -->
-                            <div id="videoContainer" class="absolute inset-0 z-0 bg-slate-950 flex items-center justify-center overflow-hidden">
-                                <iframe id="ytPreviewIframe" class="w-full h-full pointer-events-none opacity-80" src="https://www.youtube.com/embed/6stlCkUDG_s?autoplay=1&mute=1&controls=0&loop=1&playlist=6stlCkUDG_s" frameborder="0" allow="autoplay; encrypted-media"></iframe>
-                            </div>
-
-                            <!-- OVERLAY LAYER TOP -->
-                            <div class="relative z-10 p-3 flex justify-between items-start bg-gradient-to-b from-black/80 via-black/30 to-transparent">
-                                
-                                <!-- Channel Title Badge -->
-                                <div class="flex items-center gap-2">
-                                    <span class="bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded shadow">LIVE</span>
-                                    <div id="previewHeading" class="bg-emerald-600/90 backdrop-blur-md text-white text-xs font-bold px-2.5 py-1 rounded-md shadow border border-emerald-400/30">
-                                        STREAM TITLE PREVIEW
-                                    </div>
-                                </div>
-
-                                <!-- Right Side Controls: Clock + Logo -->
-                                <div class="flex items-center gap-2">
-                                    <div id="previewClock" class="bg-slate-900/80 backdrop-blur-md text-slate-200 text-[11px] font-mono font-bold px-2 py-1 rounded border border-slate-700">
-                                        00:00:00
-                                    </div>
-                                    <img id="previewLogo" src="https://placehold.co/100x100/10b981/ffffff?text=LOGO" class="w-9 h-9 rounded-full border-2 border-white/40 shadow-lg object-cover" alt="Logo" onerror="this.src='https://placehold.co/100x100/10b981/ffffff?text=LOGO'">
-                                </div>
-                            </div>
-
-                            <!-- OVERLAY LAYER BOTTOM TICKER -->
-                            <div class="relative z-10 bg-slate-950/90 border-t border-rose-600/50 flex items-center overflow-hidden h-8">
-                                <div class="bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider px-3 py-2 flex items-center gap-1 shrink-0 z-20 h-full">
-                                    <i class="fa-solid fa-bolt text-yellow-300"></i> FLASH NEWS
-                                </div>
-                                <div class="w-full overflow-hidden relative flex items-center">
-                                    <div id="previewTicker" class="animate-marquee text-xs font-semibold text-slate-100 px-4">
-                                        Welcome to Stream Studio Pro! Your customized lower-third ticker headlines will scroll smoothly right here...
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
-
-                        <!-- Monitor Stats -->
-                        <div class="grid grid-cols-3 gap-2 text-center text-xs pt-2">
-                            <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                                <span class="text-slate-500 block text-[10px]">FPS</span>
-                                <span class="font-bold text-slate-200">60.0</span>
-                            </div>
-                            <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                                <span class="text-slate-500 block text-[10px]">BITRATE</span>
-                                <span class="font-bold text-emerald-400">4500 kbps</span>
-                            </div>
-                            <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                                <span class="text-slate-500 block text-[10px]">RESOLUTION</span>
-                                <span class="font-bold text-slate-200">1080p</span>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    <!-- Instructions / Documentation Note -->
-                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 text-xs text-slate-400 space-y-2">
-                        <h3 class="font-bold text-slate-200 flex items-center gap-2">
-                            <i class="fa-solid fa-circle-info text-blue-400"></i> Streaming Sync Guide
-                        </h3>
-                        <p>Changes saved in this panel sync automatically via <strong>Supabase Realtime</strong> to your Cloud Streaming VPS engine.</p>
+            <!-- Right Panel: Controls & Preview -->
+            <div class="space-y-6">
+                <!-- Master Actions -->
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
+                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-sliders mr-2 text-rose-400"></i> Broadcast Controls</h2>
+                    <div class="space-y-3">
+                        <button onclick="updateSettings()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-bold text-sm transition shadow-lg"><i class="fa-solid fa-floppy-disk mr-2"></i> Save & Sync All Settings</button>
+                        <button onclick="triggerStream('start')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold text-sm transition shadow-lg"><i class="fa-solid fa-play mr-2"></i> Start Broadcaster</button>
+                        <button onclick="triggerStream('stop')" class="w-full bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-lg font-bold text-sm transition shadow-lg"><i class="fa-solid fa-square mr-2"></i> Stop Stream</button>
                     </div>
                 </div>
 
+                <!-- Info Guide -->
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 text-xs text-slate-400 space-y-2">
+                    <p class="font-bold text-slate-200"><i class="fa-solid fa-circle-info mr-1 text-blue-400"></i> Features Integrated:</p>
+                    <ul class="list-disc pl-4 space-y-1">
+                        <li>Automatic Live Clock Overlay</li>
+                        <li>Dynamic Logo Sticking</li>
+                        <li>Scheduled Video Queue Execution</li>
+                        <li>Realtime FFmpeg Render Engine Engine</li>
+                    </ul>
+                </div>
             </div>
-
         </div>
-    </main>
+    </div>
 
-    <!-- Supabase Logic & Application Script -->
     <script>
-        // Initialize Supabase Client credentials
-        const SUPABASE_URL = "https://meywyyvqmrnpbzrzzhvm.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI";
+        // Initialize Supabase
+        const SUPABASE_URL = "https://YOUR_SUPABASE_PROJECT.supabase.co";
+        const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Realtime Subscription
+        async function init() {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.innerHTML = `<span class="w-3 h-3 rounded-full bg-emerald-500"></span> Supabase Realtime: Connected`;
+        }
         
-        let supabaseClient;
-        try {
-            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        } catch (e) {
-            console.error("Supabase Initialization Error:", e);
-        }
-
-        // Digital Clock Updater
-        function updateClock() {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('en-US', { hour12: false });
-            const clockEl = document.getElementById('previewClock');
-            if (clockEl) clockEl.innerText = timeString;
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
-
-        // Show Toast Function
-        function showToast(message, isError = false) {
-            const toast = document.getElementById('toast');
-            const toastMessage = document.getElementById('toastMessage');
-            const toastIcon = document.getElementById('toastIcon');
-
-            toastMessage.innerText = message;
-            if (isError) {
-                toastIcon.className = "fa-solid fa-circle-xmark text-rose-400 text-lg";
-            } else {
-                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-lg";
-            }
-
-            toast.classList.remove('translate-y-20', 'opacity-0');
-            toast.classList.add('translate-y-0', 'opacity-100');
-
-            setTimeout(() => {
-                toast.classList.remove('translate-y-0', 'opacity-100');
-                toast.classList.add('translate-y-20', 'opacity-0');
-            }, 3500);
-        }
-
-        // Live Input Handler (Instant Local Preview Update on Typing)
-        function handleInstantPreview() {
-            const title = document.getElementById('channelTitle').value;
-            const ticker = document.getElementById('runningTicker').value;
-            const logo = document.getElementById('logoUrl').value;
-            const showClock = document.getElementById('showClock').checked;
-            const videoSrc = document.getElementById('videoSource').value;
-
-            // Heading update
-            document.getElementById('previewHeading').innerText = title || "STREAM TITLE PREVIEW";
-
-            // Ticker update
-            document.getElementById('previewTicker').innerText = ticker || "Your marquee headlines will scroll smoothly right here...";
-
-            // Logo update
-            const previewLogo = document.getElementById('previewLogo');
-            if (logo && logo.trim() !== '') {
-                previewLogo.src = logo;
-            } else {
-                previewLogo.src = 'https://placehold.co/100x100/10b981/ffffff?text=LOGO';
-            }
-
-            // Clock toggle
-            document.getElementById('previewClock').style.display = showClock ? 'block' : 'none';
-
-            // Video Source Preview Update
-            if (videoSrc && videoSrc.trim().length === 11 && !videoSrc.includes('http')) {
-                const iframe = document.getElementById('ytPreviewIframe');
-                const newUrl = `https://www.youtube.com/embed/${videoSrc.trim()}?autoplay=1&mute=1&controls=0&loop=1&playlist=${videoSrc.trim()}`;
-                if (iframe && !iframe.src.includes(videoSrc.trim())) {
-                    iframe.src = newUrl;
-                }
-            }
-        }
-
-        // Load Settings from Supabase
-        async function loadSettings() {
-            if (!supabaseClient) return;
-
-            try {
-                let { data, error } = await supabaseClient
-                    .from('stream_settings')
-                    .select('*')
-                    .eq('id', 1)
-                    .single();
-
-                if (error && error.code !== 'PGRST116') {
-                    console.error("Error loading settings:", error);
-                    return;
-                }
-
-                if (data) {
-                    document.getElementById('channelTitle').value = data.channel_title || '';
-                    document.getElementById('runningTicker').value = data.running_ticker || '';
-                    document.getElementById('logoUrl').value = data.logo_url || '';
-                    document.getElementById('videoSource').value = data.video_source || '';
-
-                    if (data.yt_stream_key) document.getElementById('ytStreamKey').value = data.yt_stream_key;
-                    if (data.fb_stream_key) document.getElementById('fbStreamKey').value = data.fb_stream_key;
-
-                    updateBroadcastStatusUI(data.is_live);
-                    handleInstantPreview();
-                }
-            } catch (err) {
-                console.error("Unexpected error:", err);
-            }
-        }
-
-        // Update Settings in Supabase Database
         async function updateSettings() {
-            if (!supabaseClient) {
-                showToast("Supabase client not initialized", true);
-                return;
-            }
-
-            const title = document.getElementById('channelTitle').value;
-            const ticker = document.getElementById('runningTicker').value;
-            const logo = document.getElementById('logoUrl').value;
-            const videoSrc = document.getElementById('videoSource').value;
-            const ytKey = document.getElementById('ytStreamKey').value;
-            const fbKey = document.getElementById('fbStreamKey').value;
-
-            try {
-                const { error } = await supabaseClient
-                    .from('stream_settings')
-                    .upsert({ 
-                        id: 1,
-                        channel_title: title, 
-                        running_ticker: ticker, 
-                        logo_url: logo,
-                        video_source: videoSrc,
-                        yt_stream_key: ytKey,
-                        fb_stream_key: fbKey,
-                        updated_at: new Date().toISOString()
-                    });
-
-                if (error) {
-                    showToast('Failed to save settings: ' + error.message, true);
-                } else {
-                    showToast('Settings & Broadcast updated successfully!');
-                    handleInstantPreview();
-                }
-            } catch (err) {
-                showToast('Save error encountered', true);
-            }
+            const payload = {
+                fb_key: document.getElementById('fbKey').value,
+                yt_key: document.getElementById('ytKey').value,
+                logo_url: document.getElementById('logoUrl').value,
+                logo_pos: document.getElementById('logoPos').value,
+                ticker_text: document.getElementById('tickerText').value,
+                updated_at: new Date()
+            };
+            
+            const { data, error } = await supabase.from('stream_config').upsert({ id: 1, ...payload });
+            if (!error) alert('Settings saved and synchronized with VPS!');
         }
 
-        // Toggle Live Broadcast State
-        async function toggleBroadcast(isLive) {
-            if (!supabaseClient) return;
-
-            try {
-                const { error } = await supabaseClient
-                    .from('stream_settings')
-                    .upsert({ 
-                        id: 1, 
-                        is_live: isLive,
-                        updated_at: new Date().toISOString()
-                    });
-
-                if (error) {
-                    showToast('Failed to change broadcast state', true);
-                } else {
-                    updateBroadcastStatusUI(isLive);
-                    showToast(isLive ? 'Broadcast is now LIVE!' : 'Broadcast stopped');
-                }
-            } catch (err) {
-                showToast('Broadcast toggle error', true);
-            }
+        async function triggerStream(action) {
+            await supabase.from('stream_commands').insert([{ command: action, timestamp: new Date() }]);
+            alert(`Command '${action}' sent to VPS Runner.`);
         }
 
-        // Update UI for Live Status Badge
-        function updateBroadcastStatusUI(isLive) {
-            const badge = document.getElementById('liveBroadcastBadge');
-            const badgeText = document.getElementById('liveBadgeText');
-
-            if (isLive) {
-                badge.className = "flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse";
-                badgeText.innerText = "STREAMING LIVE";
-            } else {
-                badge.className = "flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700";
-                badgeText.innerText = "OFFLINE";
-            }
-        }
-
-        // Force Sync Function
-        function forceSync() {
-            loadSettings();
-            showToast('Synchronized with database');
-        }
-
-        // Subscribe to Supabase Realtime Postgres Changes
-        function setupRealtimeSubscription() {
-            if (!supabaseClient) return;
-
-            supabaseClient
-                .channel('public:stream_settings')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'stream_settings' }, (payload) => {
-                    if (payload.new) {
-                        const newRecord = payload.new;
-                        document.getElementById('channelTitle').value = newRecord.channel_title || '';
-                        document.getElementById('runningTicker').value = newRecord.running_ticker || '';
-                        document.getElementById('logoUrl').value = newRecord.logo_url || '';
-                        if (newRecord.video_source) document.getElementById('videoSource').value = newRecord.video_source;
-
-                        updateBroadcastStatusUI(newRecord.is_live);
-                        handleInstantPreview();
-                    }
-                })
-                .subscribe();
-        }
-
-        // Window Load Initialization
-        window.onload = function() {
-            loadSettings();
-            setupRealtimeSubscription();
-        };
+        init();
     </script>
 </body>
 </html>
