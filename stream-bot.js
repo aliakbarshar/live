@@ -27,7 +27,7 @@ async function startBroadcaster() {
     // Supabase مان سيٽنگز کڻو
     const { data: config, error } = await supabase.from('stream_config').select('*').eq('id', 1).single();
     if (error || !config) {
-        console.error("Failed to load stream_config from Supabase.");
+        console.error("Failed to load stream_config from Supabase:", error);
         return;
     }
 
@@ -37,25 +37,32 @@ async function startBroadcaster() {
         return;
     }
 
-    // پلي لسٽ مان وڊيو سورس وٺو (جيڪڏهن متبادل نه هجي ته ڊيفالٽ هلائيندو)
-    let videoSource = "sample.mp4"; 
+    // پلي لسٽ مان وڊيو سورس وٺو
+    let videoSource = "C:\\live\\videos\\TestTrack1.mp4"; 
     if (config.playlist && config.playlist.length > 0) {
         videoSource = config.playlist[0].url; // پهريون شڊيول وڊيو
     }
 
+    // جيڪڏهن پينل مان 'Local File: filename.mp4' لکجي آيو آهي ته ان مان پاٿ صاف ڪريو
+    if (videoSource.startsWith("Local File: ")) {
+        const fileName = videoSource.replace("Local File: ", "");
+        videoSource = `C:\\live\\videos\\${fileName}`;
+    }
+
     const rtmpDestination = `rtmps://live-api-s.facebook.com:443/rtmp/${fbKey}`;
 
-    console.log(`Starting FFmpeg stream for video: ${videoSource}`);
+    console.log(`Starting 24/7 Continuous FFmpeg stream for video: ${videoSource}`);
 
-    // FFmpeg ڪمانڊ (فيس بوڪ جي معيار مطابق)
+    // FFmpeg ڪمانڊ (24/7 Loop ۽ Facebook Standards لاءِ)
     const ffmpegArgs = [
-        '-re',
-        '-i', videoSource,
+        '-stream_loop', '-1',          // وڊيو کي مسلسل لوپ ۾ هلائڻ لاءِ
+        '-re',                         // حقيقي وقت (Realtime) اسپيڊ تي هلائڻ لاءِ
+        '-i', videoSource,             // وڊيو فائل پاٿ يا لنڪ
         '-c:v', 'libx264',
         '-preset', 'veryfast',
-        '-b:v', '3000k',
-        '-maxrate', '3000k',
-        '-bufsize', '6000k',
+        '-b:v', '2500k',
+        '-maxrate', '2500k',
+        '-bufsize', '5000k',
         '-pix_fmt', 'yuv420p',
         '-g', '60',
         '-c:a', 'aac',
