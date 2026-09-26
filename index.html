@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stream Studio Pro Multi-Broadcaster</title>
+    <title>Stream Studio Pro Advanced Broadcaster</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; margin: 0; }
-        .container { max-width: 800px; margin: 0 auto; background: #1e293b; padding: 25px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); }
+        .container { max-width: 850px; margin: 0 auto; background: #1e293b; padding: 25px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); }
         h2 { text-align: center; color: #38bdf8; margin-bottom: 20px; }
         .section { background: #0f172a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #334155; }
         .section h3 { color: #f59e0b; margin-top: 0; }
         .form-group { margin-bottom: 12px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
-        input[type="text"], select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: #fff; box-sizing: border-box; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: #fff; box-sizing: border-box; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
         .btn { width: 100%; padding: 12px; margin-top: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.2s; }
         .btn-sync { background: #2563eb; color: white; }
         .btn-sync:hover { background: #1d4ed8; }
@@ -22,16 +23,17 @@
         .btn-start:hover { background: #15803d; }
         .btn-stop { background: #dc2626; color: white; }
         .btn-add { background: #0891b2; color: white; padding: 8px; font-size: 14px; margin-top: 5px; }
+        .btn-switch { background: #d97706; color: white; padding: 10px; font-size: 14px; }
         #status { margin-top: 15px; text-align: center; font-weight: bold; padding: 12px; border-radius: 6px; font-size: 18px; }
-        .playlist-item { display: flex; gap: 10px; margin-bottom: 5px; }
+        .playlist-item { display: flex; gap: 10px; margin-bottom: 5px; align-items: center; }
         .playlist-item input { flex: 1; }
-        .playlist-item button { background: #e11d48; color: white; border: none; border-radius: 6px; padding: 0 12px; cursor: pointer; }
+        .playlist-item button { background: #e11d48; color: white; border: none; border-radius: 6px; padding: 10px 14px; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>📡 Stream Studio Pro Multi-Broadcaster</h2>
+    <h2>📡 Stream Studio Pro Advanced Broadcaster</h2>
 
     <!-- Section 1: Keys -->
     <div class="section">
@@ -49,10 +51,14 @@
     <!-- Section 2: Logo & Overlay Text -->
     <div class="section">
         <h3>🎨 Overlay & Logo Settings</h3>
-        <div class="grid-2">
+        <div class="grid-3">
             <div class="form-group">
                 <label>Logo Image Direct URL:</label>
-                <input type="text" id="logoUrl" placeholder="https://example.com/logo.png">
+                <input type="text" id="logoUrl" placeholder="https://domain.com/logo.png">
+            </div>
+            <div class="form-group">
+                <label>Logo Size (Width in Pixels):</label>
+                <input type="number" id="logoWidth" value="120" placeholder="e.g. 100">
             </div>
             <div class="form-group">
                 <label>Logo Position:</label>
@@ -65,12 +71,26 @@
             </div>
         </div>
         <div class="form-group">
-            <label>Ticker Text (پٽي تي هلندڙ ٽيڪسٽ):</label>
-            <input type="text" id="tickerText" placeholder="Enter headline/ticker text here...">
+            <label>Scrolling Ticker Text (هيٺيان آهستي آهستي هلندڙ ٽيڪسٽ):</label>
+            <input type="text" id="tickerText" placeholder="Enter continuous news/headline text here...">
         </div>
     </div>
 
-    <!-- Section 3: Playlist (Songs/Videos) -->
+    <!-- Section 3: Direct Live Track Switcher -->
+    <div class="section">
+        <h3>⚡ Direct Track Switcher (هينئر ئي ٽريڪ مٽايو)</h3>
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Select Track to Play Now:</label>
+                <select id="activeTrackSelect"></select>
+            </div>
+            <div class="form-group" style="display: flex; align-items: flex-end;">
+                <button class="btn btn-switch" onclick="switchActiveTrack()">▶️ Play Selected Track Now</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 4: Playlist (Songs/Videos) -->
     <div class="section">
         <h3>🎵 Playlist / Song List (گانن جي لسٽ)</h3>
         <div id="playlistContainer"></div>
@@ -96,13 +116,25 @@
             document.getElementById('fbKey').value = data.fb_key || '';
             document.getElementById('ytKey').value = data.yt_key || '';
             document.getElementById('logoUrl').value = data.logo_url || '';
+            document.getElementById('logoWidth').value = data.logo_width || 120;
             document.getElementById('logoPos').value = data.logo_pos || 'top-right';
             document.getElementById('tickerText').value = data.ticker_text || '';
 
             const container = document.getElementById('playlistContainer');
             container.innerHTML = '';
             const list = (data.playlist && data.playlist.length > 0) ? data.playlist : [{ url: 'https://aliakbarshar.github.io/live/TestTrack1.mp4' }];
-            list.forEach(item => addPlaylistItem(item.url));
+            
+            const selectDropdown = document.getElementById('activeTrackSelect');
+            selectDropdown.innerHTML = '';
+
+            list.forEach((item, index) => {
+                addPlaylistItem(item.url);
+                const opt = document.createElement('option');
+                opt.value = index;
+                opt.text = `Track ${index + 1}: ${item.url.substring(item.url.lastIndexOf('/') + 1)}`;
+                if(data.current_track_index === index) opt.selected = true;
+                selectDropdown.appendChild(opt);
+            });
 
             document.getElementById('status').innerText = "Status: " + (data.is_live ? "🔴 MULTI-STREAM LIVE" : "⚪ STREAM OFF");
             document.getElementById('status').style.background = data.is_live ? "#15803d" : "#334155";
@@ -124,6 +156,7 @@
         const fbKey = document.getElementById('fbKey').value.trim();
         const ytKey = document.getElementById('ytKey').value.trim();
         const logoUrl = document.getElementById('logoUrl').value.trim();
+        const logoWidth = parseInt(document.getElementById('logoWidth').value) || 120;
         const logoPos = document.getElementById('logoPos').value;
         const tickerText = document.getElementById('tickerText').value.trim();
 
@@ -135,6 +168,7 @@
             fb_key: fbKey,
             yt_key: ytKey,
             logo_url: logoUrl,
+            logo_width: logoWidth,
             logo_pos: logoPos,
             ticker_text: tickerText,
             playlist: playlist
@@ -144,6 +178,21 @@
             alert('Error saving settings: ' + error.message);
         } else {
             alert('All Settings Saved & Synced!');
+            loadSettings();
+        }
+    }
+
+    async function switchActiveTrack() {
+        const selectedIndex = parseInt(document.getElementById('activeTrackSelect').value);
+        const { error } = await _supabase.from('stream_config').update({ 
+            current_track_index: selectedIndex,
+            restart_trigger: Date.now() 
+        }).eq('id', 1);
+
+        if (error) {
+            alert('Error switching track: ' + error.message);
+        } else {
+            alert('Track Switching Signal Sent to Server!');
             loadSettings();
         }
     }
