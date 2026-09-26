@@ -3,168 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stream Studio Pro v4.0 - Cloud Server Engine</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Stream Studio Pro Panel</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: sans-serif; background: #0f172a; color: #fff; padding: 20px; direction: ltr; }
+        .container { max-width: 600px; margin: 0 auto; background: #1e293b; padding: 25px; border-radius: 12px; }
+        h2 { text-align: center; color: #38bdf8; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], textarea { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #fff; box-sizing: border-box; }
+        .btn { width: 100%; padding: 12px; margin-top: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        .btn-sync { background: #2563eb; color: white; }
+        .btn-start { background: #16a34a; color: white; }
+        .btn-stop { background: #dc2626; color: white; }
+        #status { margin-top: 15px; text-align: center; font-weight: bold; padding: 10px; border-radius: 6px; }
+    </style>
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans">
-    <div class="container mx-auto p-6 max-w-7xl">
-        <!-- Header -->
-        <header class="flex justify-between items-center mb-8 border-b border-slate-700 pb-4">
-            <div>
-                <h1 class="text-3xl font-bold text-emerald-400"><i class="fa-solid fa-cloud-arrow-up mr-2"></i> Stream Studio Pro <span class="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-1 rounded">v4.0 Cloud</span></h1>
-                <p class="text-slate-400 text-sm">Online URL & 24/7 Cloud Server Broadcaster</p>
-            </div>
-            <div id="connectionStatus" class="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg text-sm border border-slate-700">
-                <span class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></span> Connecting to Supabase...
-            </div>
-        </header>
+<body>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left Panel -->
-            <div class="lg:col-span-2 space-y-6">
-                <!-- Stream Destination -->
-                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
-                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-share-nodes mr-2 text-blue-400"></i> Stream Destination</h2>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Facebook Stream Key</label>
-                        <input type="password" id="fbKey" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none" placeholder="FB-xxxxxxxxxxxxxx">
-                    </div>
-                </div>
+<div class="container">
+    <h2>Stream Studio Pro Admin Panel</h2>
 
-                <!-- Logo & Watermark -->
-                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
-                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-image mr-2 text-purple-400"></i> Logo & Branding</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="md:col-span-2">
-                            <label class="block text-sm font-medium mb-1">Logo URL (Online Image Link)</label>
-                            <input type="text" id="logoUrl" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="https://domain.com/logo.png">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Position</label>
-                            <select id="logoPos" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm">
-                                <option value="top-right">Top Right (مٿي ساڄي)</option>
-                                <option value="top-left">Top Left (مٿي ٻائي)</option>
-                                <option value="bottom-right">Bottom Right (هيٺ ساڄي)</option>
-                                <option value="bottom-left">Bottom Left (هيٺ ٻائي)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Size (Pixels)</label>
-                            <input type="number" id="logoSize" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" value="120">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Headline & Clock -->
-                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
-                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-newspaper mr-2 text-amber-400"></i> Headline & Clock Settings</h2>
-                    <div class="space-y-4">
-                        <div class="flex items-center gap-4">
-                            <input type="checkbox" id="showClock" class="w-5 h-5 accent-emerald-500 rounded">
-                            <label for="showClock" class="text-sm font-medium">Show Live Digital Clock on Video (وڊيو تي لائيو ٽائيم ڏيکاريو)</label>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Breaking News Ticker Header</label>
-                            <input type="text" id="tickerText" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="هتي پنهنجي نيوز يا هيڊنگ لکو...">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Server Video Link (Online URL / Local Path) -->
-                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
-                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-link mr-2 text-emerald-400"></i> Video Source (Local Path OR Web Server URL)</h2>
-                    <div class="flex flex-col md:flex-row gap-2 mb-4">
-                        <input type="text" id="videoUrl" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="https://aliakbarshar.github.io/live/TestTrack1.mp4 OR C:/TestTrack1.mp4">
-                        <button onclick="addToSchedule()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium text-sm"><i class="fa-solid fa-plus mr-1"></i> Add Video</button>
-                    </div>
-                    <table class="w-full text-left text-sm text-slate-400">
-                        <thead class="bg-slate-900 text-slate-300">
-                            <tr><th class="p-2">Source URL / Local Path</th><th class="p-2">Action</th></tr>
-                        </thead>
-                        <tbody id="scheduleList"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Right Panel Controls -->
-            <div class="space-y-6">
-                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl sticky top-6">
-                    <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-sliders mr-2 text-rose-400"></i> Quick Actions</h2>
-                    <div class="space-y-3">
-                        <button onclick="updateSettings()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-bold text-sm transition"><i class="fa-solid fa-floppy-disk mr-2"></i> Save & Sync All Settings</button>
-                        <button onclick="triggerStream('start')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold text-sm transition"><i class="fa-solid fa-play mr-2"></i> Start Cloud Broadcaster</button>
-                        <button onclick="triggerStream('stop')" class="w-full bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-lg font-bold text-sm transition"><i class="fa-solid fa-square mr-2"></i> Stop Stream</button>
-                    </div>
-                    <div class="mt-6 p-4 bg-slate-900 rounded-lg text-xs text-slate-400 border border-slate-700">
-                        <p class="font-bold text-slate-200 mb-1"><i class="fa-solid fa-server mr-1 text-emerald-400"></i> 24/7 Cloud Support:</p>
-                        <p>توهان `https://aliakbarshar.github.io/live/TestTrack1.mp4` لنڪ سيٽ ڪري پنهنجو پي سي بند به ڪري ڇڏيندؤ ته به اسٽريم سرور تان هلي رهندي.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="form-group">
+        <label>Facebook Stream Key:</label>
+        <input type="text" id="fbKey" placeholder="Paste FB Stream Key Here">
     </div>
 
-    <script>
-        const SUPABASE_URL = "https://meywyyvqmrnpbzrzzhvm.supabase.co";
-        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI";
-        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        let scheduleItems = [];
+    <div class="form-group">
+        <label>Video Stream URL:</label>
+        <input type="text" id="videoUrl" value="https://aliakbarshar.github.io/live/TestTrack1.mp4">
+    </div>
 
-        async function init() {
-            const { data } = await _supabase.from('stream_config').select('*').eq('id', 1).maybeSingle();
-            if (data) {
-                if (data.fb_key) document.getElementById('fbKey').value = data.fb_key;
-                if (data.logo_url) document.getElementById('logoUrl').value = data.logo_url;
-                if (data.logo_pos) document.getElementById('logoPos').value = data.logo_pos;
-                if (data.logo_size) document.getElementById('logoSize').value = data.logo_size;
-                if (data.ticker_text) document.getElementById('tickerText').value = data.ticker_text;
-                if (data.show_clock !== undefined) document.getElementById('showClock').checked = data.show_clock;
-                if (data.playlist) { scheduleItems = data.playlist; renderSchedule(); }
+    <button class="btn btn-sync" onclick="saveSettings()">💾 Save & Sync All Settings</button>
+    <button class="btn btn-start" onclick="toggleStream(true)">▶️ Start Cloud Broadcaster</button>
+    <button class="btn btn-stop" onclick="toggleStream(false)">⏹️ Stop Stream</button>
+
+    <div id="status">Status: Connecting...</div>
+</div>
+
+<script>
+    const SUPABASE_URL = 'https://meywyyvqmrnpbzrzzhvm.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI';
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    async function loadSettings() {
+        const { data, error } = await _supabase.from('stream_config').select('*').eq('id', 1).single();
+        if (data) {
+            document.getElementById('fbKey').value = data.fb_key || '';
+            if(data.playlist && data.playlist[0]) {
+                document.getElementById('videoUrl').value = data.playlist[0].url;
             }
-            document.getElementById('connectionStatus').innerHTML = `<span class="w-3 h-3 rounded-full bg-emerald-500"></span> Supabase Connected`;
+            document.getElementById('status').innerText = "Status: " + (data.is_live ? "🔴 Stream Active (LIVE)" : "⚪ Stream Stopped");
+            document.getElementById('status').style.background = data.is_live ? "#15803d" : "#334155";
+        }
+    }
+
+    async function saveSettings() {
+        const fbKey = document.getElementById('fbKey').value.trim();
+        const videoUrl = document.getElementById('videoUrl').value.trim();
+
+        const { error } = await _supabase.from('stream_config').upsert({
+            id: 1,
+            fb_key: fbKey,
+            playlist: [{ url: videoUrl }]
+        });
+
+        if (error) {
+            alert('Error saving settings: ' + error.message);
+        } else {
+            alert('Settings Saved Successfully!');
+            loadSettings();
+        }
+    }
+
+    async function toggleStream(status) {
+        const fbKey = document.getElementById('fbKey').value.trim();
+        if(status && !fbKey) {
+            alert("Please enter Facebook Stream Key first!");
+            return;
         }
 
-        async function updateSettings() {
-            const payload = {
-                id: 1,
-                fb_key: document.getElementById('fbKey').value,
-                logo_url: document.getElementById('logoUrl').value,
-                logo_pos: document.getElementById('logoPos').value,
-                logo_size: parseInt(document.getElementById('logoSize').value) || 120,
-                ticker_text: document.getElementById('tickerText').value,
-                show_clock: document.getElementById('showClock').checked,
-                playlist: scheduleItems,
-                updated_at: new Date()
-            };
-            const { error } = await _supabase.from('stream_config').upsert(payload);
-            if (!error) alert('سيٽنگز ۽ وڊيو لنڪ ڪاميابي سان مڪمل سيِو ٿي ويا!');
-            else alert('ايرر: ' + error.message);
+        const { error } = await _supabase.from('stream_config').update({ is_live: status }).eq('id', 1);
+        if (error) {
+            alert('Error changing status: ' + error.message);
+        } else {
+            alert(status ? "Starting Broadcaster..." : "Stopping Broadcaster...");
+            loadSettings();
         }
+    }
 
-        function addToSchedule() {
-            const url = document.getElementById('videoUrl').value.trim();
-            if (url) { scheduleItems.push({ url }); renderSchedule(); document.getElementById('videoUrl').value = ''; }
-        }
+    loadSettings();
+</script>
 
-        function removeItem(idx) { scheduleItems.splice(idx, 1); renderSchedule(); }
-
-        function renderSchedule() {
-            document.getElementById('scheduleList').innerHTML = scheduleItems.map((item, idx) => `
-                <tr class="border-t border-slate-700">
-                    <td class="p-2 truncate text-slate-300 font-mono text-xs">${item.url}</td>
-                    <td class="p-2"><button onclick="removeItem(${idx})" class="text-rose-400"><i class="fa-solid fa-trash"></i></button></td>
-                </tr>
-            `).join('');
-        }
-
-        async function triggerStream(action) {
-            await _supabase.from('stream_commands').insert([{ command: action, timestamp: new Date() }]);
-            alert(`ڪمانڊ '${action}' موڪلي وئي!`);
-        }
-
-        window.onload = init;
-    </script>
 </body>
 </html>
