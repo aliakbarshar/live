@@ -4,7 +4,7 @@ const { spawn } = require('child_process');
 
 // Supabase Client Initialization
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://meywyyvqmrnpbzrzzhvm.supabase.co";
-const SUPABASE_KEY = process.env.SUPABASE_KEY || "YOUR_SERVICE_ROLE_OR_ANON_KEY";
+const SUPABASE_KEY = process.env.SUPABASE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
