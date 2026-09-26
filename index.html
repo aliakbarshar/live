@@ -61,30 +61,13 @@
                     </div>
                 </div>
 
-                <!-- Video Scheduler & Queue (Updated with Local Video Option) -->
+                <!-- Video Scheduler & Queue -->
                 <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
                     <h2 class="text-xl font-semibold mb-4 text-slate-200 border-b border-slate-700 pb-2"><i class="fa-solid fa-clock mr-2 text-emerald-400"></i> Video Scheduler & Automation</h2>
                     
-                    <!-- Source Selection Toggle -->
-                    <div class="mb-4 flex gap-4 text-sm font-medium">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="radio" name="sourceType" value="url" checked onclick="toggleSourceType('url')" class="accent-emerald-500">
-                            <span><i class="fa-solid fa-link mr-1"></i> VPS Path / URL</span>
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="radio" name="sourceType" value="file" onclick="toggleSourceType('file')" class="accent-emerald-500">
-                            <span><i class="fa-solid fa-folder-open mr-1"></i> Local Video File</span>
-                        </label>
-                    </div>
-
                     <div class="flex flex-col md:flex-row gap-2 mb-4">
-                        <!-- URL Input -->
-                        <div id="urlInputContainer" class="flex-1">
-                            <input type="text" id="videoUrl" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="VPS Path (e.g., /root/videos/live.mp4) or Online MP4 URL">
-                        </div>
-                        <!-- Local File Input -->
-                        <div id="fileInputContainer" class="flex-1 hidden">
-                            <input type="file" id="localVideoFile" accept="video/*" onchange="handleFileSelect(event)" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:bg-emerald-600 file:text-white file:cursor-pointer">
+                        <div class="flex-1">
+                            <input type="text" id="videoUrl" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm" placeholder="VPS Path (e.g. C:\live\videos\TestTrack1.mp4) or Direct MP4 Link">
                         </div>
 
                         <input type="time" id="scheduleTime" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm">
@@ -96,13 +79,12 @@
                             <thead class="bg-slate-900 text-slate-300">
                                 <tr>
                                     <th class="p-2">Time</th>
-                                    <th class="p-2">Type</th>
                                     <th class="p-2">Source / Video Path</th>
                                     <th class="p-2">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="scheduleList">
-                                <tr><td colspan="4" class="p-4 text-center text-slate-500">No scheduled videos added yet.</td></tr>
+                                <tr><td colspan="3" class="p-4 text-center text-slate-500">No scheduled videos added yet.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -134,12 +116,11 @@
         
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         let scheduleItems = [];
-        let selectedLocalFileName = '';
 
         async function init() {
             const statusEl = document.getElementById('connectionStatus');
             try {
-                const { data, error } = await _supabase.from('stream_config').select('*').eq('id', 1).single();
+                const { data, error } = await _supabase.from('stream_config').select('*').eq('id', 1).maybeSingle();
                 
                 if (data) {
                     if (data.fb_key) document.getElementById('fbKey').value = data.fb_key;
@@ -161,69 +142,6 @@
             }
         }
 
-        function toggleSourceType(type) {
-            const urlContainer = document.getElementById('urlInputContainer');
-            const fileContainer = document.getElementById('fileInputContainer');
-            if (type === 'url') {
-                urlContainer.classList.remove('hidden');
-                fileContainer.classList.add('hidden');
-            } else {
-                urlContainer.classList.add('hidden');
-                fileContainer.classList.remove('hidden');
-            }
-        }
-
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (file) {
-                selectedLocalFileName = file.name;
-            }
-        }
-
-        function addToSchedule() {
-            const sourceType = document.querySelector('input[name="sourceType"]:checked').value;
-            const time = document.getElementById('scheduleTime').value;
-            let videoSource = '';
-
-            if (sourceType === 'url') {
-                videoSource = document.getElementById('videoUrl').value.trim();
-            } else {
-                videoSource = selectedLocalFileName ? `Local File: ${selectedLocalFileName}` : '';
-            }
-
-            if (!videoSource || !time) {
-                alert('مهرباني ڪري وڊيو سورس (پاٿ/فائل) ۽ ٽائيم ٻئي داخل ڪريو.');
-                return;
-            }
-
-            scheduleItems.push({ time, url: videoSource, type: sourceType });
-            document.getElementById('videoUrl').value = '';
-            document.getElementById('localVideoFile').value = '';
-            selectedLocalFileName = '';
-            renderSchedule();
-        }
-
-        function removeItem(index) {
-            scheduleItems.splice(index, 1);
-            renderSchedule();
-        }
-
-        function renderSchedule() {
-            const tbody = document.getElementById('scheduleList');
-            if(scheduleItems.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-500">No scheduled videos added yet.</td></tr>`;
-                return;
-            }
-            tbody.innerHTML = scheduleItems.map((item, idx) => `
-                <tr class="border-t border-slate-700">
-                    <td class="p-2 text-emerald-400 font-mono">${item.time}</td>
-                    <td class="p-2 text-xs"><span class="px-2 py-0.5 rounded ${item.type === 'file' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}">${item.type === 'file' ? 'Local File' : 'Path/URL'}</span></td>
-                    <td class="p-2 truncate max-w-xs text-slate-300">${item.url}</td>
-                    <td class="p-2"><button onclick="removeItem(${idx})" class="text-rose-400 hover:text-rose-300"><i class="fa-solid fa-trash"></i></button></td>
-                </tr>
-            `).join('');
-        }
-
         async function updateSettings() {
             const payload = {
                 id: 1,
@@ -239,15 +157,53 @@
             const { error } = await _supabase.from('stream_config').upsert(payload);
             if (!error) {
                 document.getElementById('lastSync').innerText = "Last Synced: " + new Date().toLocaleTimeString();
-                alert('سيٽنگز ۽ پلي لسٽ Supabase تي ڪاميابي سان اپڊيٽ ٿي وئي!');
+                alert('سيٽنگز ۽ پلي لسٽ ڪاميابي سان سيِو ٿي ويا!');
             } else {
-                alert('Error: ' + error.message);
+                alert('ايرر: ' + error.message);
             }
+        }
+
+        function addToSchedule() {
+            const videoSource = document.getElementById('videoUrl').value.trim();
+            const time = document.getElementById('scheduleTime').value;
+
+            if (!videoSource || !time) {
+                alert('مهرباني ڪري وڊيو پاٿ ۽ ٽائيم ٻئي داخل ڪريو.');
+                return;
+            }
+
+            scheduleItems.push({ time, url: videoSource });
+            document.getElementById('videoUrl').value = '';
+            renderSchedule();
+        }
+
+        function removeItem(index) {
+            scheduleItems.splice(index, 1);
+            renderSchedule();
+        }
+
+        function renderSchedule() {
+            const tbody = document.getElementById('scheduleList');
+            if(scheduleItems.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-500">No scheduled videos added yet.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = scheduleItems.map((item, idx) => `
+                <tr class="border-t border-slate-700">
+                    <td class="p-2 text-emerald-400 font-mono">${item.time}</td>
+                    <td class="p-2 truncate max-w-xs text-slate-300">${item.url}</td>
+                    <td class="p-2"><button onclick="removeItem(${idx})" class="text-rose-400 hover:text-rose-300"><i class="fa-solid fa-trash"></i></button></td>
+                </tr>
+            `).join('');
         }
 
         async function triggerStream(action) {
             const { error } = await _supabase.from('stream_commands').insert([{ command: action, timestamp: new Date() }]);
-            if(!error) alert(`ڪمانڊ '${action}' موفقانه موڪلي وئي!`);
+            if(!error) {
+                alert(`ڪمانڊ '${action}' موڪلي وئي!`);
+            } else {
+                alert('ايرر: ' + error.message);
+            }
         }
 
         window.onload = init;
