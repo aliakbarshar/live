@@ -13,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let ffmpegProcess = null;
 
-console.log("🚀 Multi-Stream Cloud Engine Initializing...");
+console.log("🚀 Multi-Stream Overlay Engine Initializing...");
 
 async function checkDatabaseState() {
   try {
@@ -25,14 +25,11 @@ async function checkDatabaseState() {
 
     if (error || !config) return;
 
-    // بند ڪرڻ لاءِ
     if (!config.is_live && ffmpegProcess) {
       console.log("⏹️ Stopping Broadcaster...");
       stopBroadcaster();
-    }
-    // چالو ڪرڻ لاءِ
-    else if (config.is_live && !ffmpegProcess) {
-      console.log("▶️ Starting Multi-Broadcaster...");
+    } else if (config.is_live && !ffmpegProcess) {
+      console.log("▶️ Starting Multi-Broadcaster with Logo & Text...");
       startBroadcaster(config);
     }
   } catch (err) {
@@ -46,8 +43,10 @@ function startBroadcaster(config) {
     : [{ url: 'https://aliakbarshar.github.io/live/TestTrack1.mp4' }];
 
   const videoUrl = playlist[0].url;
+  const logoUrl = config.logo_url || 'https://aliakbarshar.github.io/live/logo.png'; // ڊيفالٽ لوگو لنڪ
+  const overlayText = config.overlay_text || 'LIVE STREAMING'; // ڊيفالٽ ٽيڪسٽ
 
-  // Stream Output Targets Setup
+  // Output URLs Setup (Facebook + YouTube)
   const outputs = [];
 
   if (config.fb_key && config.fb_key.trim() !== '') {
@@ -59,17 +58,26 @@ function startBroadcaster(config) {
   }
 
   if (outputs.length === 0) {
-    console.error("❌ No valid Stream Keys found for Facebook or YouTube!");
+    console.error("❌ No valid Stream Keys found!");
     return;
   }
 
   console.log(`🎬 Streaming Video: ${videoUrl}`);
-  console.log(`📡 Targets Active: ${outputs.length} Platform(s)`);
+  console.log(`🖼️ Logo: ${logoUrl}`);
+  console.text ? console.log(`📝 Text: ${overlayText}`) : null;
 
+  // FFmpeg Input Arguments
   let ffmpegArgs = [
     '-re',
     '-stream_loop', '-1',
     '-i', videoUrl,
+    '-i', logoUrl, // Logo Input (Input 1)
+    '-filter_complex', 
+    // [1:v] Scale logo to 120px width & Overlay top-right (x=main_w-overlay_w-10:y=10)
+    // Drawtext for custom text overlay on bottom-left
+    `[1:v]scale=120:-1[logo];[0:v][logo]overlay=main_w-overlay_w-20:20,drawtext=text='${overlayText}':x=20:y=h-50:fontsize=24:fontcolor=white:box=1:boxcolor=black@0.5[vout]`,
+    '-map', '[vout]',
+    '-map', '0:a',
     '-c:v', 'libx264',
     '-preset', 'veryfast',
     '-b:v', '3000k',
@@ -82,14 +90,13 @@ function startBroadcaster(config) {
     '-ar', '44100'
   ];
 
-  // Multiple Destinations handling
+  // Multiple Destinations handling (Tee muxer for Dual Stream)
   if (outputs.length === 1) {
     ffmpegArgs.push('-f', 'flv', outputs[0]);
   } else {
-    // Duplicate stream for multiple platforms (Facebook + YouTube)
     ffmpegArgs.push(
       '-f', 'tee',
-      `-map`, `0:v`, `-map`, `0:a`,
+      `-map`, `[vout]`, `-map`, `0:a`,
       `[f=flv]${outputs[0]}|[f=flv]${outputs[1]}`
     );
   }
@@ -117,5 +124,5 @@ function stopBroadcaster() {
 // Check database state every 5 seconds
 setInterval(checkDatabaseState, 5000);
 
-app.get('/', (req, res) => res.send('Multi-Platform Cloud Broadcaster Active!'));
+app.get('/', (req, res) => res.send('Overlay-Enabled Multi-Platform Broadcaster Active!'));
 app.listen(PORT, () => console.log(`🌐 Server running on port ${PORT}`));
