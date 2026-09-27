@@ -134,11 +134,7 @@
             const list = (data.playlist && data.playlist.length > 0) ? data.playlist : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
 
             if (isInitialLoad) {
-                const container = document.getElementById('playlistContainer');
-                container.innerHTML = '';
-                list.forEach((item, index) => {
-                    addPlaylistItem(item.url, index === activeTrackIndexGlobal, index);
-                });
+                renderPlaylistItems(list);
                 isInitialLoad = false;
             } else {
                 updatePlayingBadges();
@@ -151,6 +147,14 @@
         }
     }
 
+    function renderPlaylistItems(list) {
+        const container = document.getElementById('playlistContainer');
+        container.innerHTML = '';
+        list.forEach((item, index) => {
+            addPlaylistItem(item.url, index === activeTrackIndexGlobal, index);
+        });
+    }
+
     function addPlaylistItem(url = '', isActive = false, index = null) {
         const container = document.getElementById('playlistContainer');
         const div = document.createElement('div');
@@ -161,12 +165,19 @@
         div.innerHTML = `
             <div class="badge-holder">${isActive ? '<span class="active-badge">▶ Playing Now</span>' : `<button class="btn-play" onclick="playSpecificTrack(${trackIdx})">▶ Switch Now</button>`}</div>
             <input type="text" class="song-url" value="${url}" placeholder="https://domain.com/video.mp4" oninput="refreshDropdownList()">
-            <button class="btn-remove" onclick="this.parentElement.remove(); refreshDropdownList();">X</button>
+            <button class="btn-remove" onclick="removePlaylistItem(this)">X</button>
         `;
         container.appendChild(div);
+        refreshDropdownList();
     }
 
-    function updatePlayingBadges() {
+    function removePlaylistItem(btn) {
+        btn.parentElement.remove();
+        reindexPlaylist();
+        refreshDropdownList();
+    }
+
+    function reindexPlaylist() {
         const items = document.querySelectorAll('.playlist-item');
         items.forEach((item, index) => {
             const holder = item.querySelector('.badge-holder');
@@ -178,6 +189,10 @@
                 }
             }
         });
+    }
+
+    function updatePlayingBadges() {
+        reindexPlaylist();
     }
 
     function refreshDropdownList() {
@@ -294,7 +309,7 @@
         }
     }
 
-    // Realtime Auto-Sync
+    // Realtime Auto-Sync Fixes
     _supabase.channel('schema-db-changes')
         .on(
             'postgres_changes',
@@ -304,11 +319,13 @@
                     if (payload.new.next_track) {
                         document.getElementById('nextTrack').value = payload.new.next_track;
                     }
-                    if (payload.new.current_track_index !== activeTrackIndexGlobal) {
+                    if (payload.new.current_track_index !== undefined && payload.new.current_track_index !== activeTrackIndexGlobal) {
                         activeTrackIndexGlobal = payload.new.current_track_index || 0;
                         updatePlayingBadges();
                         refreshDropdownList();
                     }
+                    document.getElementById('status').innerText = "Status: " + (payload.new.is_live ? "🔴 LIVE BROADCASTING" : "⚪ STREAM OFF");
+                    document.getElementById('status').style.background = payload.new.is_live ? "#15803d" : "#334155";
                 }
             }
         )
