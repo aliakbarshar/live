@@ -15,7 +15,7 @@ let ffmpegProcess = null;
 let lastRestartTrigger = null;
 let currentConfig = null;
 
-// 🔹 فونٽ فائيل پاتھ
+// 🔹 فونٽ فائيل جو نالو
 const FONT_PATH = './sindhi.ttf';
 
 console.log("🚀 Live Studio Pro Engine Starting...");
@@ -35,7 +35,7 @@ async function checkDatabaseState() {
     // جيئن ئي Trigger يا Settings تبديل ٿين
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Trigger Changed! Restarting Stream...");
+      console.log("🔄 Settings/Trigger Changed! Restarting Stream...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -103,8 +103,8 @@ function startBroadcaster(config) {
   }
 
   let ffmpegArgs = [
+    '-stream_loop', '-1', // 🔹 هي ڪوڊ FFmpeg کي ڪڏهن به بند ٿيڻ نه ڏيندو، وڊيو خودبخود لائيِو جاري رهندي
     '-re',
-    '-stream_loop', '-1', // 🔹 ٽريڪ کي آٽوميٽڪ نئين سر چالو رکڻ لاءِ (Stream Drop نہ ٿيندي)
     '-reconnect', '1',
     '-reconnect_at_eof', '1',
     '-reconnect_streamed', '1',
