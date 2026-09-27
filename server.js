@@ -28,7 +28,6 @@ async function checkDatabaseState() {
 
     if (error || !config) return;
 
-    // Direct Track Switch Signal
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
       console.log("🔄 Track change signal detected! Restarting broadcast...");
@@ -83,18 +82,14 @@ function startBroadcaster(config) {
   const logoUrl = config.logo_url || 'https://aliakbarshar.github.io/live/logo.png';
   const logoPos = config.logo_pos || 'top-right';
   const logoWidth = config.logo_width || 120;
-  const tickerText = config.ticker_text || config.overlay_text || '';
+  const tickerText = config.ticker_text || '';
 
   const overlayPosFilter = getLogoOverlayPosition(logoPos);
 
   const outputs = [];
 
-  // Facebook Stream Processing (FB Stream Key formatting)
   if (config.fb_key && config.fb_key.trim() !== '') {
-    let rawFbKey = config.fb_key.trim();
-    // Remove trailing/leading slashes if any
-    rawFbKey = rawFbKey.replace(/^\/+|\/+$/g, '');
-    
+    let rawFbKey = config.fb_key.trim().replace(/^\/+|\/+$/g, '');
     if (rawFbKey.startsWith('rtmp://') || rawFbKey.startsWith('rtmps://')) {
       outputs.push(rawFbKey);
     } else {
@@ -102,11 +97,8 @@ function startBroadcaster(config) {
     }
   }
 
-  // YouTube Stream Processing
   if (config.yt_key && config.yt_key.trim() !== '') {
-    let rawYtKey = config.yt_key.trim();
-    rawYtKey = rawYtKey.replace(/^\/+|\/+$/g, '');
-    
+    let rawYtKey = config.yt_key.trim().replace(/^\/+|\/+$/g, '');
     if (rawYtKey.startsWith('rtmp://') || rawYtKey.startsWith('rtmps://')) {
       outputs.push(rawYtKey);
     } else {
@@ -122,7 +114,6 @@ function startBroadcaster(config) {
   console.log(`🎬 Stream Started. Active Track Index: ${trackIndex}`);
   console.log(`📡 Stream Outputs Count: ${outputs.length}`);
 
-  // Base Scale & Overlay Filters
   let filterComplex = `[1:v]scale=${logoWidth}:-1[logo];[0:v][logo]${overlayPosFilter}[vlogo]`;
   let finalVideoMap = '[vlogo]';
 
@@ -157,7 +148,6 @@ function startBroadcaster(config) {
   if (outputs.length === 1) {
     ffmpegArgs.push('-f', 'flv', outputs[0]);
   } else {
-    // Escaped pipe tee muxer for multi-destination
     const teeString = outputs.map(url => `[f=flv]${url}`).join('|');
     ffmpegArgs.push('-f', 'tee', teeString);
   }
