@@ -12,6 +12,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
+let currentConfig = null;
 
 console.log("🚀 Live Studio Pro Engine Starting...");
 
@@ -25,9 +26,11 @@ async function checkDatabaseState() {
 
     if (error || !config) return;
 
+    currentConfig = config;
+
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Settings Changed! Restarting Stream with new Overlay...");
+      console.log("🔄 Settings Changed! Restarting Stream...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -39,12 +42,26 @@ async function checkDatabaseState() {
       console.log("⏹️ Live Signal OFF. Stopping...");
       stopBroadcaster();
     } else if (config.is_live && !ffmpegProcess) {
-      console.log("▶️ Live Signal ON. Launching Studio Broadcaster...");
+      console.log("▶️ Live Signal ON. Launching Broadcaster...");
       startBroadcaster(config);
     }
   } catch (err) {
     console.error("Database Loop Error:", err);
   }
+}
+
+async function playNextTrackInPlaylist() {
+  if (!currentConfig || !currentConfig.playlist || currentConfig.playlist.length === 0) return;
+  
+  const totalTracks = currentConfig.playlist.length;
+  let nextIndex = ((currentConfig.current_track_index || 0) + 1) % totalTracks;
+
+  console.log(`🎵 Track finished. Moving automatically to Track index: ${nextIndex}`);
+
+  await supabase.from('stream_config').update({
+    current_track_index: nextIndex,
+    restart_trigger: Date.now()
+  }).eq('id', 1);
 }
 
 function startBroadcaster(config) {
@@ -76,7 +93,6 @@ function startBroadcaster(config) {
   const ticker = config.ticker_text || '';
   const logoUrl = (config.logo_url && config.logo_url.trim() !== '') ? config.logo_url.trim() : 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/React-icon.svg/1200px-React-icon.svg.png';
   
-  // Custom Size & Position
   const logoSize = config.logo_size || '120';
   const pos = config.logo_position || 'top-right';
 
@@ -86,8 +102,6 @@ function startBroadcaster(config) {
   else if (pos === 'bottom-left') overlayPos = '30:main_h-overlay_h-70';
 
   let videoFilter = `[1:v]scale=${logoSize}:-1[logo];[0:v][logo]overlay=${overlayPos}[v1]`;
-
-  // Font options for correct Sindhi rendering
   const fontOpt = "fontfile='./Lateef-Regular.ttf':text_shaping=1:direction=rtl";
 
   if (program || nextTrk || ticker) {
@@ -105,7 +119,6 @@ function startBroadcaster(config) {
     '-reconnect_streamed', '1',
     '-reconnect_delay_max', '2',
     '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-    '-stream_loop', '-1',
     '-i', activeVideoUrl,
     '-i', logoUrl,
     '-filter_complex', videoFilter,
@@ -128,8 +141,16 @@ function startBroadcaster(config) {
 
   try {
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
+    
     ffmpegProcess.stderr.on('data', (data) => console.log(`[FFmpeg]: ${data.toString()}`));
-    ffmpegProcess.on('close', (code) => { ffmpegProcess = null; });
+    
+    ffmpegProcess.on('close', (code) => { 
+      ffmpegProcess = null;
+      // Normal closure means video ended, switch to next track automatically
+      if (code === 0 || code === null) {
+        playNextTrackInPlaylist();
+      }
+    });
   } catch (e) {
     console.error("Spawn Error:", e.message);
   }
@@ -137,6 +158,7 @@ function startBroadcaster(config) {
 
 function stopBroadcaster() {
   if (ffmpegProcess) {
+    ffmpegProcess.removeAllListeners('close');
     ffmpegProcess.kill('SIGKILL');
     ffmpegProcess = null;
   }
