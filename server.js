@@ -14,9 +14,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 let currentConfig = null;
-let isSwitchingTrack = false;
 
-// 🔹 نئين .ttf فونٽ فائل جو پاتھ
+// 🔹 فونٽ فائيل پاتھ
 const FONT_PATH = './sindhi.ttf';
 
 console.log("🚀 Live Studio Pro Engine Starting...");
@@ -33,9 +32,10 @@ async function checkDatabaseState() {
 
     currentConfig = config;
 
+    // جيئن ئي Trigger يا Settings تبديل ٿين
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Settings Changed! Restarting Stream...");
+      console.log("🔄 Trigger Changed! Restarting Stream...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -46,46 +46,12 @@ async function checkDatabaseState() {
     if (!config.is_live && ffmpegProcess) {
       console.log("⏹️ Live Signal OFF. Stopping...");
       stopBroadcaster();
-    } else if (config.is_live && !ffmpegProcess && !isSwitchingTrack) {
+    } else if (config.is_live && !ffmpegProcess) {
       console.log("▶️ Live Signal ON. Launching Broadcaster...");
       startBroadcaster(config);
     }
   } catch (err) {
     console.error("Database Loop Error:", err);
-  }
-}
-
-async function handleTrackCompletion() {
-  if (isSwitchingTrack) return;
-  isSwitchingTrack = true;
-
-  try {
-    if (!currentConfig || !currentConfig.playlist || currentConfig.playlist.length === 0) {
-      isSwitchingTrack = false;
-      return;
-    }
-
-    if (!currentConfig.is_live) {
-      isSwitchingTrack = false;
-      return;
-    }
-
-    const total = currentConfig.playlist.length;
-    let nextIndex = ((currentConfig.current_track_index || 0) + 1) % total;
-
-    console.log(`🎵 Video Ended -> Advancing smoothly to Track ${nextIndex + 1} / ${total}`);
-
-    await supabase.from('stream_config').update({
-      current_track_index: nextIndex
-    }).eq('id', 1);
-
-    currentConfig.current_track_index = nextIndex;
-
-    startBroadcaster(currentConfig);
-  } catch (err) {
-    console.error("Track Switching Error:", err);
-  } finally {
-    isSwitchingTrack = false;
   }
 }
 
@@ -124,7 +90,6 @@ function startBroadcaster(config) {
 
   let videoFilter = `[1:v]scale=${logoSize}:-1[logo];[0:v][logo]overlay=${overlayPos}[v1]`;
   
-  // 🔹 Text Shaping Option (سنڌي الفابيٽن کي جوڙڻ ۽ دٻا ختم ڪرڻ لاءِ)
   const fontOpt = fs.existsSync(FONT_PATH) 
     ? `fontfile='${FONT_PATH}':text_shaping=1` 
     : `font='DejaVu Sans':text_shaping=1`;
@@ -139,6 +104,7 @@ function startBroadcaster(config) {
 
   let ffmpegArgs = [
     '-re',
+    '-stream_loop', '-1', // 🔹 ٽريڪ کي آٽوميٽڪ نئين سر چالو رکڻ لاءِ (Stream Drop نہ ٿيندي)
     '-reconnect', '1',
     '-reconnect_at_eof', '1',
     '-reconnect_streamed', '1',
@@ -170,8 +136,7 @@ function startBroadcaster(config) {
 
     ffmpegProcess.on('close', (code) => { 
       ffmpegProcess = null;
-      console.log(`[FFmpeg Finished Track]: Code ${code}`);
-      handleTrackCompletion();
+      console.log(`[FFmpeg Closed]: Code ${code}`);
     });
   } catch (e) {
     console.error("Spawn Error:", e.message);
