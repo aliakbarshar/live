@@ -34,6 +34,8 @@ function sanitizeText(text) {
 }
 
 async function checkDatabaseState() {
+  if (isSwitching) return;
+
   try {
     const { data: config, error } = await supabase
       .from('stream_config')
@@ -58,6 +60,8 @@ async function checkDatabaseState() {
       stopBroadcaster();
     } else if (config.is_live && !ffmpegProcess && !isSwitching) {
       console.log("▶️ Live Signal ON. Starting Stream...");
+      // هتي lastRestartTrigger پهرين سيٽ ڪئي وئي آهي ته جيئن بار بار ريسٽارٽ نه ٿئي
+      if (config.restart_trigger) lastRestartTrigger = config.restart_trigger;
       startBroadcaster(config);
     }
   } catch (err) {
@@ -84,21 +88,25 @@ async function handleNextTrackAuto() {
 
     console.log(`🎵 Video Ended! Seamless Switching to Track Index: ${nextIndex}`);
 
+    const newTrigger = Date.now();
+    lastRestartTrigger = newTrigger;
+
     await supabase.from('stream_config').update({
       current_track_index: nextIndex,
-      next_track: autoNextTrackText
+      next_track: autoNextTrackText,
+      restart_trigger: newTrigger
     }).eq('id', 1);
 
     config.current_track_index = nextIndex;
     config.next_track = autoNextTrackText;
+    config.restart_trigger = newTrigger;
     currentConfig = config;
 
-    // ترت نئين وڊيو اسٽارٽ ڪريو ته جيئن اسٽريم نه ٽٽي
     startBroadcaster(config);
-    isSwitching = false;
 
   } catch (err) {
     console.error("Auto Switch Error:", err);
+  } finally {
     isSwitching = false;
   }
 }
@@ -172,7 +180,8 @@ function startBroadcaster(config) {
     '-g', '60',
     '-c:a', 'aac',
     '-b:a', '128k',
-    '-ar', '44100'
+    '-ar', '44100',
+    '-ac', '2'
   ];
 
   // Tee Muxer استعمال ڪري ٻنهي سرورن ڏانهن ايمبيڊڊ اسٽريمنگ
@@ -192,7 +201,7 @@ function startBroadcaster(config) {
       console.log(`[FFmpeg Track Finished] Exit Code: ${code}`);
       ffmpegProcess = null;
       
-      if (currentConfig && currentConfig.is_live) {
+      if (currentConfig && currentConfig.is_live && !isSwitching) {
         handleNextTrackAuto();
       }
     });
