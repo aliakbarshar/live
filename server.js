@@ -13,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Server Engine Starting...");
+console.log("🚀 Server Engine Starting (Stable & High Performance)...");
 
 async function checkDatabaseState() {
   try {
@@ -62,21 +62,34 @@ function startBroadcaster(config) {
   let rawKey = config.fb_key ? config.fb_key.trim() : (config.yt_key ? config.yt_key.trim() : '');
 
   if (!rawKey) {
-    console.error("❌ ERROR: FB Key is missing!");
+    console.error("❌ ERROR: Stream Key is missing!");
     return;
   }
 
+  // Auto detect & append proper Facebook or YouTube RTMP/RTMPS URL
   let targetUrl = rawKey;
   if (!rawKey.startsWith('rtmp://') && !rawKey.startsWith('rtmps://')) {
-    targetUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${rawKey}`;
+    if (config.fb_key && config.fb_key.trim() !== '') {
+      targetUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${rawKey}`;
+    } else {
+      targetUrl = `rtmp://a.rtmp.youtube.com/live2/${rawKey}`;
+    }
   }
+
+  console.log(`📡 Streaming to Target: ${targetUrl.substring(0, 30)}...`);
 
   let ffmpegArgs = [
     '-re',
+    '-reconnect', '1',
+    '-reconnect_at_eof', '1',
+    '-reconnect_streamed', '1',
+    '-reconnect_delay_max', '2',
+    '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     '-stream_loop', '-1',
     '-i', activeVideoUrl,
     '-c:v', 'libx264',
     '-preset', 'ultrafast',
+    '-tune', 'zerolatency',
     '-b:v', '2500k',
     '-maxrate', '2500k',
     '-bufsize', '5000k',
