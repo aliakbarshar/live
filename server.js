@@ -1,88 +1,13 @@
-const { createClient } = require('@supabase/supabase-js');
-const { spawn } = require('child_process');
-const express = require('express');
-
-const app = express();
-const PORT = process.env.PORT || 10000;
-
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://meywyyvqmrnpbzrzzhvm.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-let ffmpegProcess = null;
-let lastRestartTrigger = null;
-
-console.log("🚀 Live Studio Pro Engine Starting...");
-
-async function checkDatabaseState() {
-  try {
-    const { data: config, error } = await supabase
-      .from('stream_config')
-      .select('*')
-      .eq('id', 1)
-      .single();
-
-    if (error || !config) return;
-
-    if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
-      lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Settings or Overlay Changed! Resetting Broadcast...");
-      stopBroadcaster();
-      if (config.is_live) {
-        startBroadcaster(config);
-      }
-      return;
-    }
-
-    if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Live Signal OFF. Stopping...");
-      stopBroadcaster();
-    } else if (config.is_live && !ffmpegProcess) {
-      console.log("▶️ Live Signal ON. Launching Studio Broadcaster...");
-      startBroadcaster(config);
-    }
-  } catch (err) {
-    console.error("Database Loop Error:", err);
-  }
-}
-
-function startBroadcaster(config) {
-  const playlist = (config.playlist && config.playlist.length > 0) 
-    ? config.playlist 
-    : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
-
-  const trackIndex = (config.current_track_index !== undefined && playlist[config.current_track_index]) 
-    ? config.current_track_index 
-    : 0;
-
-  const activeVideoUrl = playlist[trackIndex].url;
-  console.log(`🎬 Stream URL: ${activeVideoUrl}`);
-
-  let rawKey = config.fb_key ? config.fb_key.trim() : (config.yt_key ? config.yt_key.trim() : '');
-
-  if (!rawKey) {
-    console.error("❌ ERROR: Stream Key is missing!");
-    return;
-  }
-
-  let targetUrl = rawKey;
-  if (!rawKey.startsWith('rtmp://') && !rawKey.startsWith('rtmps://')) {
-    if (config.fb_key && config.fb_key.trim() !== '') {
-      targetUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${rawKey}`;
-    } else {
-      targetUrl = `rtmp://a.rtmp.youtube.com/live2/${rawKey}`;
-    }
-  }
-
-  // Construct FFmpeg Drawtext & Overlay Filters
+// Studio Overlays setup with proper text encoding
   const program = config.program_name || 'LIVE BROADCAST';
   const nextTrk = config.next_track || '';
-  const ticker = config.ticker_text || 'Welcome to Stream Studio Live Broadcasting!';
+  const ticker = config.ticker_text || 'ڀليڪار! اسٽريم اسٽوڊيو لائيِو براڊڪاسٽنگ';
 
-  let videoFilter = `drawtext=text='${program}':x=30:y=30:fontsize=24:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=5,` +
-                    `drawtext=text='${nextTrk}':x=30:y=65:fontsize=18:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=3,` +
-                    `drawtext=text='${ticker}':x=w-mod(max(t-2\\,0)*120\\,w+tw):y=h-40:fontsize=22:fontcolor=white:box=1:boxcolor=red@0.8:boxborderw=8`;
+  // Direct position calculations:
+  // Marquee ticker moving from Left-to-Right: x=-tw+mod(t*120\,w+tw)
+  let videoFilter = `drawtext=text='${program}':x=30:y=30:fontsize=26:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=5,` +
+                    `drawtext=text='${nextTrk}':x=30:y=65:fontsize=20:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=3,` +
+                    `drawtext=text='${ticker}':x=-tw+mod(t*150\\,w+tw):y=h-45:fontsize=24:fontcolor=white:box=1:boxcolor=red@0.8:boxborderw=8`;
 
   let ffmpegArgs = [
     '-re',
@@ -108,36 +33,3 @@ function startBroadcaster(config) {
     '-f', 'flv',
     targetUrl
   ];
-
-  try {
-    ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
-
-    ffmpegProcess.stderr.on('data', (data) => {
-      console.log(`[FFmpeg Logs]: ${data.toString()}`);
-    });
-
-    ffmpegProcess.on('error', (err) => {
-      console.error("❌ FFmpeg Error:", err.message);
-    });
-
-    ffmpegProcess.on('close', (code) => {
-      console.log(`🔴 FFmpeg Stopped with code: ${code}`);
-      ffmpegProcess = null;
-    });
-  } catch (e) {
-    console.error("❌ Spawn Error:", e.message);
-  }
-}
-
-function stopBroadcaster() {
-  if (ffmpegProcess) {
-    ffmpegProcess.kill('SIGKILL');
-    ffmpegProcess = null;
-    console.log("🛑 Broadcast Stopped.");
-  }
-}
-
-setInterval(checkDatabaseState, 5000);
-
-app.get('/', (req, res) => res.send('Studio Engine Active'));
-app.listen(PORT, () => console.log(`🌐 Server Active on Port ${PORT}`));
