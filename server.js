@@ -8,7 +8,6 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://meywyyvqmrnpbzrzzhvm.supabase.co';
-
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI';
 
 if (!SUPABASE_KEY) {
@@ -26,7 +25,6 @@ const FONT_PATH = path.join(__dirname, 'sindhi.ttf');
 
 console.log("🚀 Live Studio Pro Ultra Engine Starting...");
 
-// FFmpeg drawtext هينڊلنگ لاءِ متن کي سيڪيوئر ڪرڻ جو فنڪشن
 function sanitizeText(text) {
   if (!text) return '';
   return text
@@ -47,7 +45,7 @@ async function checkDatabaseState() {
 
     currentConfig = config;
 
-    // مانوئل سوئچ يا بٽڻ دبائڻ جي صورت ۾
+    // مانوئل سوئچ يا پلي لسٽ اپڊيٽ جي صورت ۾
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
       console.log("🔄 Manual Switch / Config Changed!");
@@ -84,7 +82,7 @@ async function handleNextTrackAuto() {
     const upcomingIndex = (nextIndex + 1) % totalTracks;
     const autoNextTrackText = `Track ${upcomingIndex + 1} of ${totalTracks}`;
 
-    console.log(`🎵 Video Ended! Auto-switching to Track Index: ${nextIndex}`);
+    console.log(`🎵 Video Ended! Seamless Switching to Track Index: ${nextIndex}`);
 
     await supabase.from('stream_config').update({
       current_track_index: nextIndex,
@@ -95,10 +93,9 @@ async function handleNextTrackAuto() {
     config.next_track = autoNextTrackText;
     currentConfig = config;
 
-    setTimeout(() => {
-      startBroadcaster(config);
-      isSwitching = false;
-    }, 1000);
+    // ترت نئين وڊيو اسٽارٽ ڪريو ته جيئن اسٽريم نه ٽٽي
+    startBroadcaster(config);
+    isSwitching = false;
 
   } catch (err) {
     console.error("Auto Switch Error:", err);
@@ -158,7 +155,7 @@ function startBroadcaster(config) {
     '-reconnect', '1',
     '-reconnect_at_eof', '1',
     '-reconnect_streamed', '1',
-    '-reconnect_delay_max', '5',
+    '-reconnect_delay_max', '2',
     '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     '-i', activeVideoUrl,
     '-i', logoUrl,
@@ -172,14 +169,20 @@ function startBroadcaster(config) {
     '-maxrate', '2500k',
     '-bufsize', '5000k',
     '-pix_fmt', 'yuv420p',
-    '-g', '30',
+    '-g', '60',
     '-c:a', 'aac',
     '-b:a', '128k',
     '-ar', '44100'
   ];
 
-  if (fbTarget) ffmpegArgs.push('-f', 'flv', fbTarget);
-  if (ytTarget) ffmpegArgs.push('-f', 'flv', ytTarget);
+  // Tee Muxer استعمال ڪري ٻنهي سرورن ڏانهن ايمبيڊڊ اسٽريمنگ
+  let targets = [];
+  if (fbTarget) targets.push(`[f=flv:onfail=ignore]${fbTarget}`);
+  if (ytTarget) targets.push(`[f=flv:onfail=ignore]${ytTarget}`);
+
+  if (targets.length > 0) {
+    ffmpegArgs.push('-f', 'tee', targets.join('|'));
+  }
 
   try {
     console.log(`▶️ Playing Track [Index: ${trackIndex}]: ${activeVideoUrl}`);
@@ -195,7 +198,6 @@ function startBroadcaster(config) {
     });
 
     ffmpegProcess.stderr.on('data', (data) => {
-      // ڊيبگنگ چيڪ ڪرڻ لاءِ:
       // console.log(`FFmpeg Log: ${data.toString()}`);
     });
 
