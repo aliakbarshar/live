@@ -45,6 +45,29 @@
         </div>
     </div>
 
+    <!-- Studio Overlays & Graphic Controls -->
+    <div class="section">
+        <h3>🎨 Live Studio Overlays & Graphics</h3>
+        <div class="form-group">
+            <label>لوگو تصوير جي ڊائريڪٽ لنڪ (PNG/JPG URL):</label>
+            <input type="text" id="logoUrl" placeholder="https://domain.com/logo.png">
+        </div>
+        <div class="grid-2">
+            <div class="form-group">
+                <label>پروگرام / شو جو نالو (Program Title):</label>
+                <input type="text" id="programName" placeholder="مثال: لائيِو سنڌي پروگرام">
+            </div>
+            <div class="form-group">
+                <label>ايندڙ وڊيو/سونگ جو نالو (Next Track Title):</label>
+                <input type="text" id="nextTrack" placeholder="مثال: ايندڙ گانو: سنڌي ڪلام">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>هيٺيان هلندڙ بريڪنگ نيوز پٽي (Ticker Text):</label>
+            <input type="text" id="tickerText" placeholder="هتي پنهنجي هلندڙ پٽي يا بريڪنگ نيوز لکو...">
+        </div>
+    </div>
+
     <!-- Track Switcher -->
     <div class="section">
         <h3>⚡ Direct Track Switcher</h3>
@@ -67,7 +90,7 @@
     </div>
 
     <!-- Controls -->
-    <button class="btn btn-sync" onclick="saveSettings()">💾 Save Settings</button>
+    <button class="btn btn-sync" onclick="saveSettings()">💾 Save Settings & Overlays</button>
     <button class="btn btn-start" onclick="toggleStream(true)">▶️ Start Live Stream</button>
     <button class="btn btn-stop" onclick="toggleStream(false)">⏹️ Stop Stream</button>
 
@@ -85,9 +108,15 @@
             document.getElementById('fbKey').value = data.fb_key || '';
             document.getElementById('ytKey').value = data.yt_key || '';
             
+            // Studio Overlays
+            document.getElementById('logoUrl').value = data.logo_url || '';
+            document.getElementById('programName').value = data.program_name || '';
+            document.getElementById('nextTrack').value = data.next_track || '';
+            document.getElementById('tickerText').value = data.ticker_text || '';
+
             const container = document.getElementById('playlistContainer');
             container.innerHTML = '';
-            const list = (data.playlist && data.playlist.length > 0) ? data.playlist : [{ url: 'https://aliakbarshar.github.io/live/TestTrack1.mp4' }];
+            const list = (data.playlist && data.playlist.length > 0) ? data.playlist : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
             
             const selectDropdown = document.getElementById('activeTrackSelect');
             selectDropdown.innerHTML = '';
@@ -120,18 +149,28 @@
     async function saveSettings() {
         const fbKey = document.getElementById('fbKey').value.trim();
         const ytKey = document.getElementById('ytKey').value.trim();
+        const logoUrl = document.getElementById('logoUrl').value.trim();
+        const programName = document.getElementById('programName').value.trim();
+        const nextTrack = document.getElementById('nextTrack').value.trim();
+        const tickerText = document.getElementById('tickerText').value.trim();
+
         const urlInputs = document.querySelectorAll('.song-url');
         const playlist = Array.from(urlInputs).map(input => ({ url: input.value.trim() })).filter(item => item.url !== '');
 
         const { error } = await _supabase.from('stream_config').update({
             fb_key: fbKey,
             yt_key: ytKey,
-            playlist: playlist
+            logo_url: logoUrl,
+            program_name: programName,
+            next_track: nextTrack,
+            ticker_text: tickerText,
+            playlist: playlist,
+            restart_trigger: Date.now()
         }).eq('id', 1);
 
         if (error) alert('Error: ' + error.message);
         else {
-            alert('Settings Saved!');
+            alert('Studio Settings & Overlays Saved!');
             loadSettings();
         }
     }
