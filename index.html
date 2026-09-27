@@ -150,7 +150,7 @@
         container.appendChild(div);
     }
 
-    // 🔹 مينوئل طريقي سان ڪو به گانو / ٽريڪ فوراً هلائڻ جو فنڪشن
+    // 🔹 مينوئل ٽريڪ مٽائڻ وارو فنڪشن
     async function playSpecificTrack(index) {
         const urlInputs = document.querySelectorAll('.song-url');
         const playlist = Array.from(urlInputs).map(input => ({ url: input.value.trim() })).filter(item => item.url !== '');
@@ -170,6 +170,7 @@
         }
     }
 
+    // 🔹 سيٽنگس سيوي ڪرڻ وارو فنڪشن (restart_trigger کان سواءِ، تاڪِ هلندڙ وڊيو بند نه ٿئي)
     async function saveSettings() {
         const fbKey = document.getElementById('fbKey').value.trim();
         const ytKey = document.getElementById('ytKey').value.trim();
@@ -192,9 +193,7 @@
             program_name: programName,
             next_track: nextTrack,
             ticker_text: tickerText,
-            playlist: playlist,
-            current_track_index: activeTrackIndexGlobal, // 🔹 هلندڙ ٽريڪ کي ري سيٽ ٿيڻ کان بچائڻ لاءِ
-            restart_trigger: Date.now()
+            playlist: playlist
         }).eq('id', 1);
 
         if (error) {
@@ -226,9 +225,8 @@
         }
     }
 
+    // پيج کولڻ مهل صرف هڪ دفعو سيٽنگ لوڊ ٿيندي
     loadSettings();
-    // Auto refresh settings every 5 seconds to accurately reflect server track changes
-    setInterval(loadSettings, 5000);
 </script>
 
 </body>
