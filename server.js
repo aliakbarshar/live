@@ -13,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 let currentConfig = null;
-let isSwitchingTrack = false;
+let isTrackChanging = false;
 
 console.log("🚀 Live Studio Pro Engine Starting...");
 
@@ -31,7 +31,7 @@ async function checkDatabaseState() {
 
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Settings/Track Changed! Restarting Stream...");
+      console.log("🔄 Settings Changed! Restarting Stream...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -42,7 +42,7 @@ async function checkDatabaseState() {
     if (!config.is_live && ffmpegProcess) {
       console.log("⏹️ Live Signal OFF. Stopping...");
       stopBroadcaster();
-    } else if (config.is_live && !ffmpegProcess && !isSwitchingTrack) {
+    } else if (config.is_live && !ffmpegProcess && !isTrackChanging) {
       console.log("▶️ Live Signal ON. Launching Broadcaster...");
       startBroadcaster(config);
     }
@@ -52,32 +52,28 @@ async function checkDatabaseState() {
 }
 
 async function playNextTrackInPlaylist() {
-  if (isSwitchingTrack) return;
-  isSwitchingTrack = true;
+  if (isTrackChanging) return;
+  isTrackChanging = true;
 
   try {
     if (!currentConfig || !currentConfig.playlist || currentConfig.playlist.length === 0) {
-      isSwitchingTrack = false;
+      isTrackChanging = false;
       return;
     }
-    
-    const totalTracks = currentConfig.playlist.length;
-    let currentIdx = currentConfig.current_track_index || 0;
-    let nextIndex = (currentIdx + 1) % totalTracks;
 
-    console.log(`🎵 Track finished! Auto-advancing from Track ${currentIdx} to Track ${nextIndex}`);
+    const total = currentConfig.playlist.length;
+    let nextIndex = ((currentConfig.current_track_index || 0) + 1) % total;
+
+    console.log(`🎵 Track ended! Advancing automatically to Track ${nextIndex + 1} / ${total}`);
 
     const newTrigger = Date.now().toString();
     lastRestartTrigger = newTrigger;
 
-    const { error } = await supabase.from('stream_config').update({
+    await supabase.from('stream_config').update({
       current_track_index: nextIndex,
       restart_trigger: newTrigger
     }).eq('id', 1);
 
-    if (error) console.error("Error updating next track index:", error);
-
-    // Refresh local configuration
     currentConfig.current_track_index = nextIndex;
     currentConfig.restart_trigger = newTrigger;
 
@@ -85,10 +81,10 @@ async function playNextTrackInPlaylist() {
     if (currentConfig.is_live) {
       startBroadcaster(currentConfig);
     }
-  } catch (e) {
-    console.error("Failed to switch track:", e);
+  } catch (err) {
+    console.error("Track Switching Error:", err);
   } finally {
-    isSwitchingTrack = false;
+    isTrackChanging = false;
   }
 }
 
@@ -98,26 +94,18 @@ function startBroadcaster(config) {
     : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
 
   let trackIndex = config.current_track_index || 0;
-  if (trackIndex >= playlist.length) {
-    trackIndex = 0;
-  }
+  if (trackIndex >= playlist.length) trackIndex = 0;
 
   const activeVideoUrl = playlist[trackIndex].url;
-  console.log(`🎬 Playing Track [${trackIndex + 1}/${playlist.length}]: ${activeVideoUrl}`);
 
   let fbKey = config.fb_key ? config.fb_key.trim() : '';
   let ytKey = config.yt_key ? config.yt_key.trim() : '';
 
-  if (!fbKey && !ytKey) {
-    console.log("❌ No Stream Keys provided!");
-    return;
-  }
+  if (!fbKey && !ytKey) return;
 
-  // Target Formatting
   let fbTarget = fbKey ? (fbKey.startsWith('rtmp') ? fbKey : `rtmps://live-api-s.facebook.com:443/rtmp/${fbKey}`) : '';
   let ytTarget = ytKey ? (ytKey.startsWith('rtmp') ? ytKey : `rtmp://a.rtmp.youtube.com/live2/${ytKey}`) : '';
 
-  // Overlay Config
   const program = config.program_name || '';
   const nextTrk = config.next_track || '';
   const ticker = config.ticker_text || '';
@@ -144,9 +132,7 @@ function startBroadcaster(config) {
 
   let ffmpegArgs = [
     '-re',
-    '-reconnect', '1',
-    '-reconnect_at_eof', '0',
-    '-reconnect_streamed', '0',
+    '-reconnect', '0',
     '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     '-i', activeVideoUrl,
     '-i', logoUrl,
@@ -166,21 +152,16 @@ function startBroadcaster(config) {
     '-ar', '44100'
   ];
 
-  if (fbTarget) {
-    ffmpegArgs.push('-f', 'flv', fbTarget);
-  }
-  if (ytTarget) {
-    ffmpegArgs.push('-f', 'flv', ytTarget);
-  }
+  if (fbTarget) ffmpegArgs.push('-f', 'flv', fbTarget);
+  if (ytTarget) ffmpegArgs.push('-f', 'flv', ytTarget);
 
   try {
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
-    
     ffmpegProcess.stderr.on('data', (data) => console.log(`[FFmpeg]: ${data.toString()}`));
     
     ffmpegProcess.on('close', (code) => { 
       ffmpegProcess = null;
-      console.log(`[FFmpeg Closed Code]: ${code}. Triggering next track...`);
+      console.log(`[FFmpeg Closed]: Code ${code}. Moving to next track...`);
       playNextTrackInPlaylist();
     });
   } catch (e) {
