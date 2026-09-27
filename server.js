@@ -13,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Live Studio Pro Engine Starting...");
+console.log("🚀 Live Studio Pro Engine Starting (MB Lateefi Font Enabled)...");
 
 async function checkDatabaseState() {
   try {
@@ -75,15 +75,18 @@ function startBroadcaster(config) {
     }
   }
 
-  // ٽيڪسٽ فلٽر ۽ پٽي سيٽنگون
-  const program = config.program_name || 'LIVE BROADCAST';
+  // Overlays Data
+  const program = config.program_name || 'لائيِو سنڌي پروگرام';
   const nextTrk = config.next_track || '';
   const ticker = config.ticker_text || 'ڀليڪار! اسٽريم اسٽوڊيو لائيِو براڊڪاسٽنگ';
 
-  // x=-tw+mod(t*150\,w+tw) پٽي کي کاٻي (Left) کان ساڄي (Right) طرف هلائيندو
-  let videoFilter = `drawtext=text='${program}':x=30:y=30:fontsize=26:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=5,` +
-                    `drawtext=text='${nextTrk}':x=30:y=65:fontsize=20:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=3,` +
-                    `drawtext=text='${ticker}':x=-tw+mod(t*150\\,w+tw):y=h-45:fontsize=24:fontcolor=white:box=1:boxcolor=red@0.8:boxborderw=8`;
+  // Online Web Font CDN for MB Lateefi / Naskh Font
+  const fontUrl = "https://db.onlinewebfonts.com/t/b2570ec402764ecff4b56583fd2370a4.ttf";
+
+  // FFmpeg drawtext with Fontfile and left-to-right ticker
+  let videoFilter = `drawtext=fontfile='${fontUrl}':text='${program}':x=30:y=30:fontsize=32:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6,` +
+                    `drawtext=fontfile='${fontUrl}':text='${nextTrk}':x=30:y=75:fontsize=24:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=4,` +
+                    `drawtext=fontfile='${fontUrl}':text='${ticker}':x=-tw+mod(t*140\\,w+tw):y=h-50:fontsize=30:fontcolor=white:box=1:boxcolor=red@0.85:boxborderw=10`;
 
   let ffmpegArgs = [
     '-re',
