@@ -114,7 +114,6 @@
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let activeTrackIndexGlobal = 0;
-    let isInitialLoad = true;
 
     async function loadSettings() {
         const { data, error } = await _supabase.from('stream_config').select('*').eq('id', 1).single();
@@ -133,13 +132,7 @@
 
             const list = (data.playlist && data.playlist.length > 0) ? data.playlist : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
 
-            if (isInitialLoad) {
-                renderPlaylistItems(list);
-                isInitialLoad = false;
-            } else {
-                updatePlayingBadges();
-            }
-
+            renderPlaylistItems(list);
             refreshDropdownList();
 
             document.getElementById('status').innerText = "Status: " + (data.is_live ? "🔴 LIVE BROADCASTING" : "⚪ STREAM OFF");
@@ -225,11 +218,13 @@
         const upcomingIndex = (index + 1) % totalTracks;
         const autoNextTrackText = `Track ${upcomingIndex + 1} of ${totalTracks}`;
 
+        const newTrigger = Date.now();
+
         const { error } = await _supabase.from('stream_config').update({
             current_track_index: index,
             next_track: autoNextTrackText,
             playlist: playlist,
-            restart_trigger: Date.now()
+            restart_trigger: newTrigger
         }).eq('id', 1);
 
         if (error) {
@@ -294,13 +289,14 @@
         const totalTracks = playlist.length;
         const upcomingIndex = (selectedStartTrack + 1) % totalTracks;
         const autoNextTrackText = `Track ${upcomingIndex + 1} of ${totalTracks}`;
+        const newTrigger = Date.now();
 
         const { error } = await _supabase.from('stream_config').update({ 
             is_live: status,
             current_track_index: selectedStartTrack,
             next_track: autoNextTrackText,
             playlist: playlist,
-            restart_trigger: Date.now() 
+            restart_trigger: newTrigger 
         }).eq('id', 1);
 
         if (error) alert('Error: ' + error.message);
@@ -309,7 +305,7 @@
         }
     }
 
-    // Realtime Auto-Sync Fixes
+    // Realtime Sync Engine for Auto-play
     _supabase.channel('schema-db-changes')
         .on(
             'postgres_changes',
@@ -320,7 +316,7 @@
                         document.getElementById('nextTrack').value = payload.new.next_track;
                     }
                     if (payload.new.current_track_index !== undefined && payload.new.current_track_index !== activeTrackIndexGlobal) {
-                        activeTrackIndexGlobal = payload.new.current_track_index || 0;
+                        activeTrackIndexGlobal = payload.new.current_track_index;
                         updatePlayingBadges();
                         refreshDropdownList();
                     }
