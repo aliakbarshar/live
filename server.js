@@ -13,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Live Stream Engine starting with Facebook Fix...");
+console.log("🚀 Server Engine Running (High Performance Mode)...");
 
 async function checkDatabaseState() {
   try {
@@ -27,7 +27,7 @@ async function checkDatabaseState() {
 
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Restart Signal Detected! Resetting Stream...");
+      console.log("🔄 Restart Signal Received! Resetting...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -36,14 +36,14 @@ async function checkDatabaseState() {
     }
 
     if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Live signal is OFF. Stopping stream...");
+      console.log("⏹️ Stream Command OFF. Stopping Process...");
       stopBroadcaster();
     } else if (config.is_live && !ffmpegProcess) {
-      console.log("▶️ Live signal is ON! Starting Facebook Broadcast...");
+      console.log("▶️ Stream Command ON. Starting Ultra Fast Stream...");
       startBroadcaster(config);
     }
   } catch (err) {
-    console.error("Database Check Error:", err);
+    console.error("Database Loop Error:", err);
   }
 }
 
@@ -57,33 +57,26 @@ function startBroadcaster(config) {
     : 0;
 
   const activeVideoUrl = playlist[trackIndex].url;
-  console.log(`🎬 Video URL to Play: ${activeVideoUrl}`);
+  console.log(`🎬 Streaming URL: ${activeVideoUrl}`);
 
   let rawKey = config.fb_key ? config.fb_key.trim() : (config.yt_key ? config.yt_key.trim() : '');
 
   if (!rawKey) {
-    console.error("❌ ERROR: FB Stream Key is Empty!");
+    console.error("❌ ERROR: Stream Key is missing!");
     return;
   }
 
-  // Construct Full Facebook RTMPS URL
   let targetUrl = rawKey;
   if (!rawKey.startsWith('rtmp://') && !rawKey.startsWith('rtmps://')) {
     targetUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${rawKey}`;
   }
 
-  console.log("📡 Streaming directly to Facebook Live Server...");
-
+  // Fast Pass-Through Stream Options
   let ffmpegArgs = [
     '-re',
+    '-stream_loop', '-1',
     '-i', activeVideoUrl,
-    '-c:v', 'libx264',
-    '-preset', 'veryfast',
-    '-b:v', '2500k',
-    '-maxrate', '2500k',
-    '-bufsize', '5000k',
-    '-pix_fmt', 'yuv420p',
-    '-g', '60',
+    '-c:v', 'copy',
     '-c:a', 'aac',
     '-b:a', '128k',
     '-ar', '44100',
@@ -95,19 +88,19 @@ function startBroadcaster(config) {
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
     ffmpegProcess.stderr.on('data', (data) => {
-      console.log(`[FFmpeg]: ${data.toString()}`);
+      console.log(`[FFmpeg Logs]: ${data.toString()}`);
     });
 
     ffmpegProcess.on('error', (err) => {
-      console.error("❌ FFmpeg Error:", err.message);
+      console.error("❌ FFmpeg Launch Error:", err.message);
     });
 
     ffmpegProcess.on('close', (code) => {
-      console.log(`🔴 FFmpeg Stopped with Exit Code: ${code}`);
+      console.log(`🔴 FFmpeg Stopped. Code: ${code}`);
       ffmpegProcess = null;
     });
   } catch (e) {
-    console.error("❌ Spawn Error:", e.message);
+    console.error("❌ Exception starting FFmpeg:", e.message);
   }
 }
 
@@ -115,11 +108,11 @@ function stopBroadcaster() {
   if (ffmpegProcess) {
     ffmpegProcess.kill('SIGKILL');
     ffmpegProcess = null;
-    console.log("🛑 Stream Stopped.");
+    console.log("🛑 Broadcast Stopped.");
   }
 }
 
 setInterval(checkDatabaseState, 5000);
 
-app.get('/', (req, res) => res.send('Stream Engine Ready'));
-app.listen(PORT, () => console.log(`🌐 Server Running on Port ${PORT}`));
+app.get('/', (req, res) => res.send('Stream Engine Active'));
+app.listen(PORT, () => console.log(`🌐 Web App Active on Port ${PORT}`));
