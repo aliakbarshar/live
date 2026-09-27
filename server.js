@@ -28,10 +28,10 @@ async function checkDatabaseState() {
 
     if (error || !config) return;
 
-    // Track Switch Trigger
+    // Direct Track Switch Signal
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Changing active track now...");
+      console.log("🔄 Track change signal detected! Restarting broadcast...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -40,14 +40,14 @@ async function checkDatabaseState() {
     }
 
     if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Stopping Broadcaster...");
+      console.log("⏹️ Stopping Broadcaster Engine...");
       stopBroadcaster();
     } else if (config.is_live && !ffmpegProcess) {
-      console.log("▶️ Launching Multi-Broadcaster...");
+      console.log("▶️ Launching Live Broadcast...");
       startBroadcaster(config);
     }
   } catch (err) {
-    console.error("Database Loop Error:", err);
+    console.error("Database Check Loop Error:", err);
   }
 }
 
@@ -89,9 +89,12 @@ function startBroadcaster(config) {
 
   const outputs = [];
 
-  // Facebook Stream URL Processing
+  // Facebook Stream Processing (FB Stream Key formatting)
   if (config.fb_key && config.fb_key.trim() !== '') {
-    const rawFbKey = config.fb_key.trim();
+    let rawFbKey = config.fb_key.trim();
+    // Remove trailing/leading slashes if any
+    rawFbKey = rawFbKey.replace(/^\/+|\/+$/g, '');
+    
     if (rawFbKey.startsWith('rtmp://') || rawFbKey.startsWith('rtmps://')) {
       outputs.push(rawFbKey);
     } else {
@@ -99,9 +102,11 @@ function startBroadcaster(config) {
     }
   }
 
-  // YouTube Stream URL Processing
+  // YouTube Stream Processing
   if (config.yt_key && config.yt_key.trim() !== '') {
-    const rawYtKey = config.yt_key.trim();
+    let rawYtKey = config.yt_key.trim();
+    rawYtKey = rawYtKey.replace(/^\/+|\/+$/g, '');
+    
     if (rawYtKey.startsWith('rtmp://') || rawYtKey.startsWith('rtmps://')) {
       outputs.push(rawYtKey);
     } else {
@@ -114,9 +119,10 @@ function startBroadcaster(config) {
     return;
   }
 
-  console.log(`🎬 Loaded Track Index: ${trackIndex}`);
-  console.log(`📡 Destinations Count: ${outputs.length}`);
+  console.log(`🎬 Stream Started. Active Track Index: ${trackIndex}`);
+  console.log(`📡 Stream Outputs Count: ${outputs.length}`);
 
+  // Base Scale & Overlay Filters
   let filterComplex = `[1:v]scale=${logoWidth}:-1[logo];[0:v][logo]${overlayPosFilter}[vlogo]`;
   let finalVideoMap = '[vlogo]';
 
@@ -136,7 +142,8 @@ function startBroadcaster(config) {
     '-map', finalVideoMap,
     '-map', '0:a',
     '-c:v', 'libx264',
-    '-preset', 'veryfast',
+    '-preset', 'ultrafast',
+    '-tune', 'zerolatency',
     '-b:v', '2500k',
     '-maxrate', '2500k',
     '-bufsize', '5000k',
@@ -147,15 +154,12 @@ function startBroadcaster(config) {
     '-ar', '44100'
   ];
 
-  // Multiple Stream Outputs Handling
   if (outputs.length === 1) {
     ffmpegArgs.push('-f', 'flv', outputs[0]);
   } else {
-    ffmpegArgs.push(
-      '-f', 'tee',
-      `-map`, finalVideoMap, `-map`, `0:a`,
-      `[f=flv]${outputs[0]}|[f=flv]${outputs[1]}`
-    );
+    // Escaped pipe tee muxer for multi-destination
+    const teeString = outputs.map(url => `[f=flv]${url}`).join('|');
+    ffmpegArgs.push('-f', 'tee', teeString);
   }
 
   ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
@@ -165,7 +169,7 @@ function startBroadcaster(config) {
   });
 
   ffmpegProcess.on('close', (code) => {
-    console.log(`🔴 Stream Stopped with code: ${code}`);
+    console.log(`🔴 FFmpeg Process Closed. Exit Code: ${code}`);
     ffmpegProcess = null;
   });
 }
@@ -179,5 +183,5 @@ function stopBroadcaster() {
 
 setInterval(checkDatabaseState, 5000);
 
-app.get('/', (req, res) => res.send('Stream Engine Running...'));
-app.listen(PORT, () => console.log(`🌐 Server running on port ${PORT}`));
+app.get('/', (req, res) => res.send('Stream Engine Running Cleanly...'));
+app.listen(PORT, () => console.log(`🌐 Application Listening on Port ${PORT}`));
