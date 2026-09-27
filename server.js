@@ -13,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Server Engine Running (High Performance Mode)...");
+console.log("🚀 Server Engine Ready...");
 
 async function checkDatabaseState() {
   try {
@@ -27,7 +27,7 @@ async function checkDatabaseState() {
 
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Restart Signal Received! Resetting...");
+      console.log("🔄 Restart Signal Received!");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -36,14 +36,14 @@ async function checkDatabaseState() {
     }
 
     if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Stream Command OFF. Stopping Process...");
+      console.log("⏹️ Stopping Stream...");
       stopBroadcaster();
     } else if (config.is_live && !ffmpegProcess) {
-      console.log("▶️ Stream Command ON. Starting Ultra Fast Stream...");
+      console.log("▶️ Starting Stream...");
       startBroadcaster(config);
     }
   } catch (err) {
-    console.error("Database Loop Error:", err);
+    console.error("Database Check Error:", err);
   }
 }
 
@@ -57,7 +57,7 @@ function startBroadcaster(config) {
     : 0;
 
   const activeVideoUrl = playlist[trackIndex].url;
-  console.log(`🎬 Streaming URL: ${activeVideoUrl}`);
+  console.log(`🎬 Stream Video URL: ${activeVideoUrl}`);
 
   let rawKey = config.fb_key ? config.fb_key.trim() : (config.yt_key ? config.yt_key.trim() : '');
 
@@ -71,12 +71,17 @@ function startBroadcaster(config) {
     targetUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${rawKey}`;
   }
 
-  // Fast Pass-Through Stream Options
   let ffmpegArgs = [
     '-re',
     '-stream_loop', '-1',
     '-i', activeVideoUrl,
-    '-c:v', 'copy',
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-b:v', '2500k',
+    '-maxrate', '2500k',
+    '-bufsize', '5000k',
+    '-pix_fmt', 'yuv420p',
+    '-g', '60',
     '-c:a', 'aac',
     '-b:a', '128k',
     '-ar', '44100',
@@ -92,11 +97,11 @@ function startBroadcaster(config) {
     });
 
     ffmpegProcess.on('error', (err) => {
-      console.error("❌ FFmpeg Launch Error:", err.message);
+      console.error("❌ FFmpeg Error:", err.message);
     });
 
     ffmpegProcess.on('close', (code) => {
-      console.log(`🔴 FFmpeg Stopped. Code: ${code}`);
+      console.log(`🔴 FFmpeg Closed. Code: ${code}`);
       ffmpegProcess = null;
     });
   } catch (e) {
