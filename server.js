@@ -7,7 +7,7 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Supabase Connection
+// Supabase Credentials
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://meywyyvqmrnpbzrzzhvm.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI';
 
@@ -16,7 +16,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Stream Engine Starting Simple Direct Mode...");
+console.log("🚀 Stream Studio Engine Starting Clean Direct Mode...");
 
 async function checkDatabaseState() {
   try {
@@ -28,10 +28,10 @@ async function checkDatabaseState() {
 
     if (error || !config) return;
 
-    // Track/Restart Switch Trigger
+    // Track Switch / Restart Signal
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Signal received! Restarting stream...");
+      console.log("🔄 Signal received! Restarting broadcast...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -40,7 +40,7 @@ async function checkDatabaseState() {
     }
 
     if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Stopping Broadcaster...");
+      console.log("⏹️ Stopping Stream...");
       stopBroadcaster();
     } else if (config.is_live && !ffmpegProcess) {
       console.log("▶️ Starting Live Broadcast...");
@@ -69,7 +69,6 @@ function startBroadcaster(config) {
   let fbUrl = config.fb_key ? config.fb_key.trim() : '';
   let ytUrl = config.yt_key ? config.yt_key.trim() : '';
 
-  // Single URL Resolution logic
   let targetUrl = '';
   if (fbUrl) {
     targetUrl = fbUrl.startsWith('rtmp') ? fbUrl : `rtmps://live-api-s.facebook.com:443/rtmp/${fbUrl}`;
@@ -83,9 +82,8 @@ function startBroadcaster(config) {
   }
 
   console.log(`🎬 Playing Track Index: ${trackIndex}`);
-  console.log(`📡 Stream Destination: ${targetUrl.substring(0, 30)}...`);
 
-  // Direct Light-weight Copy / Encoding
+  // Simple, ultra-fast stream command (no CPU overload)
   let ffmpegArgs = [
     '-re',
     '-f', 'concat',
@@ -128,5 +126,5 @@ function stopBroadcaster() {
 
 setInterval(checkDatabaseState, 5000);
 
-app.get('/', (req, res) => res.send('Stream Engine Running...'));
-app.listen(PORT, () => console.log(`🌐 Server active on port ${PORT}`));
+app.get('/', (req, res) => res.send('Stream Engine Active...'));
+app.listen(PORT, () => console.log(`🌐 Application Listening on Port ${PORT}`));
