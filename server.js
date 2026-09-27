@@ -16,8 +16,8 @@ let lastRestartTrigger = null;
 let currentConfig = null;
 let isSwitchingTrack = false;
 
-// 🔹 توهان جو اپلوڊ ڪيل فونٽ
-const FONT_PATH = './Lateef-Regular.ttf.otf';
+// 🔹 نئين .ttf فونٽ فائل جو پاتھ
+const FONT_PATH = './sindhi.ttf';
 
 console.log("🚀 Live Studio Pro Engine Starting...");
 
@@ -33,10 +33,9 @@ async function checkDatabaseState() {
 
     currentConfig = config;
 
-    // جيڪڏهن يوزر پينل تان Settings تبديل ڪيون هجن
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Settings/Trigger Changed! Restarting Stream...");
+      console.log("🔄 Settings Changed! Restarting Stream...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -66,7 +65,6 @@ async function handleTrackCompletion() {
       return;
     }
 
-    // جيڪڏهن بند ڪرڻ جو سگنل آيل هجي ته اڳتي نہ وڌو
     if (!currentConfig.is_live) {
       isSwitchingTrack = false;
       return;
@@ -77,14 +75,12 @@ async function handleTrackCompletion() {
 
     console.log(`🎵 Video Ended -> Advancing smoothly to Track ${nextIndex + 1} / ${total}`);
 
-    // Supabase ۾ انڊيڪس اپڊيٽ ڪريو
     await supabase.from('stream_config').update({
       current_track_index: nextIndex
     }).eq('id', 1);
 
     currentConfig.current_track_index = nextIndex;
 
-    // بغير دير جي نئون ٽريڪ سٽارٽ ڪريو
     startBroadcaster(currentConfig);
   } catch (err) {
     console.error("Track Switching Error:", err);
@@ -94,7 +90,7 @@ async function handleTrackCompletion() {
 }
 
 function startBroadcaster(config) {
-  stopBroadcaster(); // اڳوڻو FFmpeg صفايو ڪريو
+  stopBroadcaster();
 
   const playlist = (config.playlist && config.playlist.length > 0) 
     ? config.playlist 
@@ -128,10 +124,10 @@ function startBroadcaster(config) {
 
   let videoFilter = `[1:v]scale=${logoSize}:-1[logo];[0:v][logo]overlay=${overlayPos}[v1]`;
   
-  // 🔹 فونٽ فائيل پاتھ
+  // 🔹 Text Shaping Option (سنڌي الفابيٽن کي جوڙڻ ۽ دٻا ختم ڪرڻ لاءِ)
   const fontOpt = fs.existsSync(FONT_PATH) 
-    ? `fontfile='${FONT_PATH}'` 
-    : `font='DejaVu Sans'`;
+    ? `fontfile='${FONT_PATH}':text_shaping=1` 
+    : `font='DejaVu Sans':text_shaping=1`;
 
   if (program || nextTrk || ticker) {
     videoFilter += `;[v1]drawtext=text='${program}':x=30:y=30:fontsize=32:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6:${fontOpt},` +
@@ -171,10 +167,6 @@ function startBroadcaster(config) {
 
   try {
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
-
-    ffmpegProcess.stderr.on('data', (data) => {
-      // debug logs
-    });
 
     ffmpegProcess.on('close', (code) => { 
       ffmpegProcess = null;
