@@ -14,19 +14,12 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 let currentConfig = null;
-let isTrackChanging = false;
+let isSwitchingTrack = false;
 
-// 🔹 توهان جي اپلوڊ ڪيل فونٽ فائل جو پورو نالو
+// 🔹 توهان جو اپلوڊ ڪيل فونٽ
 const FONT_PATH = './Lateef-Regular.ttf.otf';
 
 console.log("🚀 Live Studio Pro Engine Starting...");
-
-// 🔹 چيڪ ڪريو ته فونٽ فائل سرور تي موجود آهي يا نه
-if (fs.existsSync(FONT_PATH)) {
-    console.log("✅ Sindhi Font File Found:", FONT_PATH);
-} else {
-    console.warn("⚠️ Warning: Font file 'Lateef-Regular.ttf.otf' not found in root directory! Please make sure it is committed to GitHub.");
-}
 
 async function checkDatabaseState() {
   try {
@@ -40,9 +33,10 @@ async function checkDatabaseState() {
 
     currentConfig = config;
 
+    // جيڪڏهن يوزر پينل تان Settings تبديل ڪيون هجن
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Settings Changed! Restarting Stream...");
+      console.log("🔄 Settings/Trigger Changed! Restarting Stream...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -53,7 +47,7 @@ async function checkDatabaseState() {
     if (!config.is_live && ffmpegProcess) {
       console.log("⏹️ Live Signal OFF. Stopping...");
       stopBroadcaster();
-    } else if (config.is_live && !ffmpegProcess && !isTrackChanging) {
+    } else if (config.is_live && !ffmpegProcess && !isSwitchingTrack) {
       console.log("▶️ Live Signal ON. Launching Broadcaster...");
       startBroadcaster(config);
     }
@@ -62,44 +56,46 @@ async function checkDatabaseState() {
   }
 }
 
-async function playNextTrackInPlaylist() {
-  if (isTrackChanging) return;
-  isTrackChanging = true;
+async function handleTrackCompletion() {
+  if (isSwitchingTrack) return;
+  isSwitchingTrack = true;
 
   try {
     if (!currentConfig || !currentConfig.playlist || currentConfig.playlist.length === 0) {
-      isTrackChanging = false;
+      isSwitchingTrack = false;
+      return;
+    }
+
+    // جيڪڏهن بند ڪرڻ جو سگنل آيل هجي ته اڳتي نہ وڌو
+    if (!currentConfig.is_live) {
+      isSwitchingTrack = false;
       return;
     }
 
     const total = currentConfig.playlist.length;
     let nextIndex = ((currentConfig.current_track_index || 0) + 1) % total;
 
-    console.log(`🎵 Track ended! Advancing automatically to Track ${nextIndex + 1} / ${total}`);
+    console.log(`🎵 Video Ended -> Advancing smoothly to Track ${nextIndex + 1} / ${total}`);
 
-    const newTrigger = Date.now().toString();
-    lastRestartTrigger = newTrigger;
-
+    // Supabase ۾ انڊيڪس اپڊيٽ ڪريو
     await supabase.from('stream_config').update({
-      current_track_index: nextIndex,
-      restart_trigger: newTrigger
+      current_track_index: nextIndex
     }).eq('id', 1);
 
     currentConfig.current_track_index = nextIndex;
-    currentConfig.restart_trigger = newTrigger;
 
-    stopBroadcaster();
-    if (currentConfig.is_live) {
-      startBroadcaster(currentConfig);
-    }
+    // بغير دير جي نئون ٽريڪ سٽارٽ ڪريو
+    startBroadcaster(currentConfig);
   } catch (err) {
     console.error("Track Switching Error:", err);
   } finally {
-    isTrackChanging = false;
+    isSwitchingTrack = false;
   }
 }
 
 function startBroadcaster(config) {
+  stopBroadcaster(); // اڳوڻو FFmpeg صفايو ڪريو
+
   const playlist = (config.playlist && config.playlist.length > 0) 
     ? config.playlist 
     : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
@@ -132,7 +128,7 @@ function startBroadcaster(config) {
 
   let videoFilter = `[1:v]scale=${logoSize}:-1[logo];[0:v][logo]overlay=${overlayPos}[v1]`;
   
-  // 🔹 فونٽ فائل جو انتخاب (جيڪڏهن اپلوڊ ٿيل فائل ملندي ته اها هلندي)
+  // 🔹 فونٽ فائيل پاتھ
   const fontOpt = fs.existsSync(FONT_PATH) 
     ? `fontfile='${FONT_PATH}'` 
     : `font='DejaVu Sans'`;
@@ -150,7 +146,7 @@ function startBroadcaster(config) {
     '-reconnect', '1',
     '-reconnect_at_eof', '1',
     '-reconnect_streamed', '1',
-    '-reconnect_delay_max', '5',
+    '-reconnect_delay_max', '2',
     '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     '-i', activeVideoUrl,
     '-i', logoUrl,
@@ -175,12 +171,15 @@ function startBroadcaster(config) {
 
   try {
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
-    ffmpegProcess.stderr.on('data', (data) => console.log(`[FFmpeg]: ${data.toString()}`));
-    
+
+    ffmpegProcess.stderr.on('data', (data) => {
+      // debug logs
+    });
+
     ffmpegProcess.on('close', (code) => { 
       ffmpegProcess = null;
-      console.log(`[FFmpeg Closed]: Code ${code}. Moving to next track...`);
-      playNextTrackInPlaylist();
+      console.log(`[FFmpeg Finished Track]: Code ${code}`);
+      handleTrackCompletion();
     });
   } catch (e) {
     console.error("Spawn Error:", e.message);
@@ -195,7 +194,7 @@ function stopBroadcaster() {
   }
 }
 
-setInterval(checkDatabaseState, 5000);
+setInterval(checkDatabaseState, 4000);
 
 app.get('/', (req, res) => res.send('Engine Active'));
 app.listen(PORT, () => console.log(`Server Active on Port ${PORT}`));
