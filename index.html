@@ -157,8 +157,14 @@
 
         if (index >= playlist.length) return;
 
+        // 🔹 ايندڙ ٽريڪ جو نالو ڳڻڻ
+        const totalTracks = playlist.length;
+        const upcomingIndex = (index + 1) % totalTracks;
+        const autoNextTrackText = `Track ${upcomingIndex + 1} of ${totalTracks}`;
+
         const { error } = await _supabase.from('stream_config').update({
             current_track_index: index,
+            next_track: autoNextTrackText,
             playlist: playlist,
             restart_trigger: Date.now()
         }).eq('id', 1);
@@ -170,7 +176,7 @@
         }
     }
 
-    // 🔹 سيٽنگس سيوي ڪرڻ وارو فنڪشن (restart_trigger کان سواءِ، تاڪِ هلندڙ وڊيو بند نه ٿئي)
+    // 🔹 سيٽنگس سيوي ڪرڻ وارو فنڪشن
     async function saveSettings() {
         const fbKey = document.getElementById('fbKey').value.trim();
         const ytKey = document.getElementById('ytKey').value.trim();
@@ -225,7 +231,23 @@
         }
     }
 
-    // پيج کولڻ مهل صرف هڪ دفعو سيٽنگ لوڊ ٿيندي
+    // 🔹 Realtime Subscription (سرور تان ٽريڪ مٽجڻ سان خودبخود next_track نظر ايندو)
+    _supabase.channel('schema-db-changes')
+        .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'stream_config', filter: 'id=eq.1' },
+            (payload) => {
+                if (payload.new) {
+                    document.getElementById('nextTrack').value = payload.new.next_track || '';
+                    if (payload.new.current_track_index !== activeTrackIndexGlobal) {
+                        activeTrackIndexGlobal = payload.new.current_track_index || 0;
+                        loadSettings();
+                    }
+                }
+            }
+        )
+        .subscribe();
+
     loadSettings();
 </script>
 
