@@ -1,208 +1,113 @@
 const { createClient } = require('@supabase/supabase-js');
 const { spawn } = require('child_process');
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
 
-const app = express();
-const PORT = process.env.PORT || 10000;
-
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://meywyyvqmrnpbzrzzhvm.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI';
-
+const SUPABASE_URL = 'https://meywyyvqmrnpbzrzzhvm.supabase.co';
+const SUPABASE_KEY = 'YOUR_SERVICE_ROLE_KEY'; // هتي سروس رول ڪي هڻو
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let ffmpegProcess = null;
-let lastRestartTrigger = null;
-let currentConfig = null;
-let isSwitching = false;
+let currentTrackIndex = 0;
+let isStreaming = false;
 
-const FONT_PATH = './sindhi.ttf';
+// 🔹 اسٽريم جي سيٽنگس Supabase مان لوڊ ڪريو ۽ چالو ڪريو
+async function startStreamController() {
+    const { data, error } = await supabase.from('stream_config').select('*').eq('id', 1).single();
+    if (error || !data) return console.log("Config load error:", error);
 
-console.log("🚀 Live Studio Pro Ultra Engine Starting...");
-
-async function checkDatabaseState() {
-  try {
-    const { data: config, error } = await supabase
-      .from('stream_config')
-      .select('*')
-      .eq('id', 1)
-      .single();
-
-    if (error || !config) return;
-
-    currentConfig = config;
-
-    // مانوئل سوئچ يا بٽڻ دبائڻ جي صورت ۾
-    if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
-      lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Manual Switch / Config Changed!");
-      startBroadcaster(config);
-      return;
+    if (!data.is_live) {
+        console.log("⚪ Stream is currently turned OFF in Database.");
+        stopFFmpeg();
+        return;
     }
 
-    if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Live Signal OFF. Stopping...");
-      stopBroadcaster();
-    } else if (config.is_live && !ffmpegProcess && !isSwitching) {
-      console.log("▶️ Live Signal ON. Starting Stream...");
-      startBroadcaster(config);
-    }
-  } catch (err) {
-    console.error("Database Loop Error:", err);
-  }
-}
-
-async function handleNextTrackAuto() {
-  if (isSwitching) return;
-  isSwitching = true;
-
-  try {
-    // ڊيٽابيس مان تازو ترين ڊيٽا حاصل ڪريو
-    const { data: config } = await supabase.from('stream_config').select('*').eq('id', 1).single();
-    if (!config || !config.is_live || !config.playlist || config.playlist.length === 0) {
-      isSwitching = false;
-      return;
+    const playlist = data.playlist || [];
+    if (playlist.length === 0) {
+        console.log("❌ Playlist is empty!");
+        return;
     }
 
-    const totalTracks = config.playlist.length;
-    let nextIndex = ((config.current_track_index || 0) + 1) % totalTracks;
+    currentTrackIndex = data.current_track_index || 0;
     
-    // ايندڙ وڊيو کان پوءِ واري وڊيو جو نالو (Next Track Info)
-    const upcomingIndex = (nextIndex + 1) % totalTracks;
-    const autoNextTrackText = `Track ${upcomingIndex + 1} of ${totalTracks}`;
+    // جيڪڏهن انڊيڪس پلي لسٽ کان وڌي وڃي ته 0 تان وري شروع ڪريو
+    if (currentTrackIndex >= playlist.length) {
+        currentTrackIndex = 0;
+    }
 
-    console.log(`🎵 Video Ended! Auto-switching to Track Index: ${nextIndex}`);
+    const currentVideoUrl = playlist[currentTrackIndex].url;
+    const streamKey = data.fb_key || data.yt_key;
 
-    // Supabase کي اپڊيٽ ڪريو
-    await supabase.from('stream_config').update({
-      current_track_index: nextIndex,
-      next_track: autoNextTrackText
-    }).eq('id', 1);
+    console.log(`▶ Playing Track ${currentTrackIndex + 1}/${playlist.length}: ${currentVideoUrl}`);
 
-    config.current_track_index = nextIndex;
-    config.next_track = autoNextTrackText;
-    currentConfig = config;
+    // FFmpeg ذريعي وڊيو اسٽريم شروع ڪريو
+    runFFmpeg(currentVideoUrl, streamKey, data, async () => {
+        // 🔁 **سونگ ختم ٿيڻ واري منطق (Auto Next Track Loop)**
+        console.log("🏁 Song finished! Moving to next track...");
+        
+        let nextIndex = (currentTrackIndex + 1) % playlist.length;
+        const upcomingIndex = (nextIndex + 1) % playlist.length;
+        const autoNextTrackText = `Track ${upcomingIndex + 1} of ${playlist.length}`;
 
-    // 1 سيڪنڊ جي وقفي کانپوءِ اڳيون ٽريڪ شروع ڪريو
-    setTimeout(() => {
-      startBroadcaster(config);
-      isSwitching = false;
-    }, 1000);
+        // Supabase ۾ نئون انڊيڪس اپڊيٽ ڪريو
+        await supabase.from('stream_config').update({
+            current_track_index: nextIndex,
+            next_track: autoNextTrackText
+        }).eq('id', 1);
 
-  } catch (err) {
-    console.error("Auto Switch Error:", err);
-    isSwitching = false;
-  }
+        // پاڻمرادو ايندڙ وڊيو هلائڻ لاءِ فنڪشن ري-ڪال (Re-call) ڪريو
+        startStreamController();
+    });
 }
 
-function startBroadcaster(config) {
-  stopBroadcaster();
+// 🔹 FFmpeg Command Runner
+function runFFmpeg(videoUrl, streamKey, config, onComplete) {
+    stopFFmpeg(); // پهريان هلندڙ ڪو پروسيس هجي ته بند ڪريو
 
-  const playlist = (config.playlist && config.playlist.length > 0) 
-    ? config.playlist 
-    : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
+    const rtmpUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${streamKey}`;
 
-  let trackIndex = config.current_track_index || 0;
-  if (trackIndex >= playlist.length) trackIndex = 0;
+    // FFmpeg Parameter Arguments
+    const args = [
+        '-re',
+        '-i', videoUrl,
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-b:v', '3000k',
+        '-maxrate', '3000k',
+        '-bufsize', '6000k',
+        '-pix_fmt', 'yuv420p',
+        '-g', '50',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-ar', '44100',
+        '-f', 'flv',
+        rtmpUrl
+    ];
 
-  const activeVideoUrl = playlist[trackIndex].url;
-
-  let fbKey = config.fb_key ? config.fb_key.trim() : '';
-  let ytKey = config.yt_key ? config.yt_key.trim() : '';
-
-  if (!fbKey && !ytKey) return;
-
-  let fbTarget = fbKey ? (fbKey.startsWith('rtmp') ? fbKey : `rtmps://live-api-s.facebook.com:443/rtmp/${fbKey}`) : '';
-  let ytTarget = ytKey ? (ytKey.startsWith('rtmp') ? ytKey : `rtmp://a.rtmp.youtube.com/live2/${ytKey}`) : '';
-
-  const program = config.program_name || '';
-  const nextTrk = config.next_track || '';
-  const ticker = config.ticker_text || '';
-  const logoUrl = (config.logo_url && config.logo_url.trim() !== '') ? config.logo_url.trim() : 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/React-icon.svg/1200px-React-icon.svg.png';
-  
-  const logoSize = config.logo_size || '120';
-  const pos = config.logo_position || 'top-right';
-
-  let overlayPos = 'main_w-overlay_w-30:30';
-  if (pos === 'top-left') overlayPos = '30:30';
-  else if (pos === 'bottom-right') overlayPos = 'main_w-overlay_w-30:main_h-overlay_h-70';
-  else if (pos === 'bottom-left') overlayPos = '30:main_h-overlay_h-70';
-
-  let videoFilter = `[1:v]scale=${logoSize}:-1[logo];[0:v][logo]overlay=${overlayPos}[v1]`;
-  
-  const fontOpt = fs.existsSync(FONT_PATH) 
-    ? `fontfile='${FONT_PATH}':text_shaping=1` 
-    : `font='DejaVu Sans':text_shaping=1`;
-
-  if (program || nextTrk || ticker) {
-    videoFilter += `;[v1]drawtext=text='${program}':x=30:y=30:fontsize=32:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6:${fontOpt},` +
-                   `drawtext=text='${nextTrk}':x=30:y=75:fontsize=22:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=4:${fontOpt},` +
-                   `drawtext=text='${ticker}':x=-tw+mod(t*140\\,w+tw):y=h-50:fontsize=28:fontcolor=white:box=1:boxcolor=red@0.85:boxborderw=10:${fontOpt}[outv]`;
-  } else {
-    videoFilter += `[outv]`;
-  }
-
-  let ffmpegArgs = [
-    '-re',
-    '-reconnect', '1',
-    '-reconnect_at_eof', '1',
-    '-reconnect_streamed', '1',
-    '-reconnect_delay_max', '5',
-    '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-    '-i', activeVideoUrl,
-    '-i', logoUrl,
-    '-filter_complex', videoFilter,
-    '-map', '[outv]',
-    '-map', '0:a?',
-    '-c:v', 'libx264',
-    '-preset', 'ultrafast',
-    '-tune', 'zerolatency',
-    '-b:v', '2500k',
-    '-maxrate', '2500k',
-    '-bufsize', '5000k',
-    '-pix_fmt', 'yuv420p',
-    '-g', '30',
-    '-c:a', 'aac',
-    '-b:a', '128k',
-    '-ar', '44100'
-  ];
-
-  if (fbTarget) ffmpegArgs.push('-f', 'flv', fbTarget);
-  if (ytTarget) ffmpegArgs.push('-f', 'flv', ytTarget);
-
-  try {
-    console.log(`▶️ Playing Track [Index: ${trackIndex}]: ${activeVideoUrl}`);
-    ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
-
-    ffmpegProcess.on('close', (code) => {
-      console.log(`[FFmpeg Track Finished] Exit Code: ${code}`);
-      ffmpegProcess = null;
-      
-      // جيڪڏهن يوزر اسٽريم بند نه ڪئي آهي ته خودبخود اگھيون ٽريڪ هلائيو
-      if (currentConfig && currentConfig.is_live) {
-        handleNextTrackAuto();
-      }
-    });
+    ffmpegProcess = spawn('ffmpeg', args);
 
     ffmpegProcess.stderr.on('data', (data) => {
-      // ڊيبگنگ لاءِ FFmpeg لاگز (ضرورت پوي ته ڏسي سگهجي ٿو)
+        // console.log(`FFmpeg: ${data}`); // Debugging لاءِ
     });
 
-  } catch (e) {
-    console.error("Spawn Error:", e.message);
-  }
+    ffmpegProcess.on('close', (code) => {
+        console.log(`FFmpeg process exited with code ${code}`);
+        if (onComplete) onComplete(); // وڊيو ختم ٿيڻ تي ٽريڪ مٽايو
+    });
 }
 
-function stopBroadcaster() {
-  if (ffmpegProcess) {
-    ffmpegProcess.removeAllListeners('close');
-    ffmpegProcess.kill('SIGKILL');
-    ffmpegProcess = null;
-  }
+function stopFFmpeg() {
+    if (ffmpegProcess) {
+        ffmpegProcess.kill('SIGKILL');
+        ffmpegProcess = null;
+    }
 }
 
-setInterval(checkDatabaseState, 2000);
+// 🔹 Realtime Database Updates (جڏهن مينوئل بٽڻ دٻايو وڃي)
+supabase.channel('schema-db-changes')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stream_config', filter: 'id=eq.1' }, (payload) => {
+        console.log("⚡ Change detected in Supabase Database...");
+        startStreamController();
+    })
+    .subscribe();
 
-app.get('/', (req, res) => res.send('Engine Active'));
-app.listen(PORT, () => console.log(`Server Active on Port ${PORT}`));
+// اسٽارٽ اپ
+startStreamController();
