@@ -13,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Live Studio Pro Engine Starting (Advanced Overlays & Logo Active)...");
+console.log("🚀 Live Studio Pro Engine Starting (Custom Logo Size & Pos Active)...");
 
 async function checkDatabaseState() {
   try {
@@ -83,8 +83,13 @@ function startBroadcaster(config) {
     ? config.logo_url.trim() 
     : 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/React-icon.svg/1200px-React-icon.svg.png';
 
-  // Render سرورز تي ڊيفالٽ Naskh/Arabic فونٽ واپرائڻ لاءِ
-  const fontPath = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+  const logoSize = config.logo_size || '120';
+  const pos = config.logo_position || 'top-right';
+
+  let overlayPos = 'main_w-overlay_w-30:30'; // top-right default
+  if (pos === 'top-left') overlayPos = '30:30';
+  else if (pos === 'bottom-right') overlayPos = 'main_w-overlay_w-30:main_h-overlay_h-70';
+  else if (pos === 'bottom-left') overlayPos = '30:main_h-overlay_h-70';
 
   let ffmpegArgs = [
     '-re',
@@ -97,8 +102,8 @@ function startBroadcaster(config) {
     '-i', activeVideoUrl,
     '-i', logoUrl,
     '-filter_complex',
-    `[1:v]scale=120:-1[logo];` +
-    `[0:v][logo]overlay=main_w-overlay_w-30:30[v1];` +
+    `[1:v]scale=${logoSize}:-1[logo];` +
+    `[0:v][logo]overlay=${overlayPos}[v1];` +
     `[v1]drawtext=text='${program}':x=30:y=30:fontsize=28:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6,` +
     `drawtext=text='${nextTrk}':x=30:y=70:fontsize=20:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=4,` +
     `drawtext=text='${ticker}':x=-tw+mod(t*140\\,w+tw):y=h-50:fontsize=26:fontcolor=white:box=1:boxcolor=red@0.85:boxborderw=10[outv]`,
