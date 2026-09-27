@@ -7,7 +7,7 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Supabase Credentials
+// Supabase Connection
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://meywyyvqmrnpbzrzzhvm.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI';
 
@@ -16,7 +16,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Stream Studio Engine Starting Clean Direct Mode...");
+console.log("🚀 Server Engine Starting with Facebook RTMP Fix...");
 
 async function checkDatabaseState() {
   try {
@@ -26,12 +26,15 @@ async function checkDatabaseState() {
       .eq('id', 1)
       .single();
 
-    if (error || !config) return;
+    if (error || !config) {
+      console.log("⚠️ Database Fetch Error or Empty Config");
+      return;
+    }
 
-    // Track Switch / Restart Signal
+    // Trigger Signal Restart
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Signal received! Restarting broadcast...");
+      console.log("🔄 Signal Received! Restarting broadcast...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -40,14 +43,14 @@ async function checkDatabaseState() {
     }
 
     if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Stopping Stream...");
+      console.log("⏹️ Stopping Broadcaster via Switch...");
       stopBroadcaster();
     } else if (config.is_live && !ffmpegProcess) {
-      console.log("▶️ Starting Live Broadcast...");
+      console.log("▶️ Live Command Detected! Starting Broadcast...");
       startBroadcaster(config);
     }
   } catch (err) {
-    console.error("Database Loop Error:", err);
+    console.error("Database Check Loop Error:", err);
   }
 }
 
@@ -66,24 +69,24 @@ function startBroadcaster(config) {
   const playlistContent = orderedPlaylist.map(item => `file '${item.url}'`).join('\n');
   fs.writeFileSync(playlistPath, playlistContent);
 
-  let fbUrl = config.fb_key ? config.fb_key.trim() : '';
-  let ytUrl = config.yt_key ? config.yt_key.trim() : '';
+  let rawKey = config.fb_key ? config.fb_key.trim() : (config.yt_key ? config.yt_key.trim() : '');
 
-  let targetUrl = '';
-  if (fbUrl) {
-    targetUrl = fbUrl.startsWith('rtmp') ? fbUrl : `rtmps://live-api-s.facebook.com:443/rtmp/${fbUrl}`;
-  } else if (ytUrl) {
-    targetUrl = ytUrl.startsWith('rtmp') ? ytUrl : `rtmp://a.rtmp.youtube.com/live2/${ytUrl}`;
-  }
-
-  if (!targetUrl) {
-    console.error("❌ No Stream Key found!");
+  if (!rawKey) {
+    console.error("❌ ERROR: Stream Key is EMPTY in database!");
     return;
   }
 
-  console.log(`🎬 Playing Track Index: ${trackIndex}`);
+  // Construct Standard FB RTMP URL
+  let targetUrl = rawKey;
+  if (!rawKey.startsWith('rtmp://') && !rawKey.startsWith('rtmps://')) {
+    // Standard Facebook RTMPS Endpoint
+    targetUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${rawKey}`;
+  }
 
-  // Simple, ultra-fast stream command (no CPU overload)
+  console.log(`🎬 Video Playlist Track Index: ${trackIndex}`);
+  console.log(`📡 Pushing Stream to Target: ${targetUrl.substring(0, 35)}...`);
+
+  // Robust FFmpeg Flags for Facebook Streaming
   let ffmpegArgs = [
     '-re',
     '-f', 'concat',
@@ -91,9 +94,7 @@ function startBroadcaster(config) {
     '-stream_loop', '-1',
     '-i', playlistPath,
     '-c:v', 'libx264',
-    '-preset', 'ultrafast',
-    '-tune', 'zerolatency',
-    '-b:v', '2500k',
+    '-preset', 'veryfast',
     '-maxrate', '2500k',
     '-bufsize', '5000k',
     '-pix_fmt', 'yuv420p',
@@ -105,26 +106,35 @@ function startBroadcaster(config) {
     targetUrl
   ];
 
-  ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
+  try {
+    ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
-  ffmpegProcess.stderr.on('data', (data) => {
-    console.log(`[FFmpeg]: ${data.toString()}`);
-  });
+    ffmpegProcess.stderr.on('data', (data) => {
+      console.log(`[FFmpeg Logs]: ${data.toString()}`);
+    });
 
-  ffmpegProcess.on('close', (code) => {
-    console.log(`🔴 FFmpeg Stopped. Code: ${code}`);
-    ffmpegProcess = null;
-  });
+    ffmpegProcess.on('error', (err) => {
+      console.error("❌ FFmpeg Failed to Launch (Is FFmpeg installed on Render?):", err.message);
+    });
+
+    ffmpegProcess.on('close', (code) => {
+      console.log(`🔴 FFmpeg Process Closed. Exit Code: ${code}`);
+      ffmpegProcess = null;
+    });
+  } catch (e) {
+    console.error("❌ Spawn Exception:", e.message);
+  }
 }
 
 function stopBroadcaster() {
   if (ffmpegProcess) {
     ffmpegProcess.kill('SIGKILL');
     ffmpegProcess = null;
+    console.log("🛑 Stream Process Terminated.");
   }
 }
 
 setInterval(checkDatabaseState, 5000);
 
-app.get('/', (req, res) => res.send('Stream Engine Active...'));
-app.listen(PORT, () => console.log(`🌐 Application Listening on Port ${PORT}`));
+app.get('/', (req, res) => res.send('Stream Engine Core Active'));
+app.listen(PORT, () => console.log(`🌐 Web App Active on Port ${PORT}`));
