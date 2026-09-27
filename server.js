@@ -13,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Live Studio Pro Engine Starting (Custom Logo Size & Pos Active)...");
+console.log("🚀 Live Studio Pro Engine Starting...");
 
 async function checkDatabaseState() {
   try {
@@ -27,7 +27,7 @@ async function checkDatabaseState() {
 
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Settings or Overlay Changed! Resetting Broadcast...");
+      console.log("🔄 Settings Changed! Restarting Stream with new Overlay...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -57,14 +57,9 @@ function startBroadcaster(config) {
     : 0;
 
   const activeVideoUrl = playlist[trackIndex].url;
-  console.log(`🎬 Stream URL: ${activeVideoUrl}`);
 
   let rawKey = config.fb_key ? config.fb_key.trim() : (config.yt_key ? config.yt_key.trim() : '');
-
-  if (!rawKey) {
-    console.error("❌ ERROR: Stream Key is missing!");
-    return;
-  }
+  if (!rawKey) return;
 
   let targetUrl = rawKey;
   if (!rawKey.startsWith('rtmp://') && !rawKey.startsWith('rtmps://')) {
@@ -75,21 +70,31 @@ function startBroadcaster(config) {
     }
   }
 
-  // Overlay Data
-  const program = config.program_name || 'لائيِو سنڌي پروگرام';
+  // Overlay Config
+  const program = config.program_name || '';
   const nextTrk = config.next_track || '';
-  const ticker = config.ticker_text || 'ڀليڪار! اسٽريم اسٽوڊيو لائيِو براڊڪاسٽنگ';
-  const logoUrl = config.logo_url && config.logo_url.trim() !== '' 
-    ? config.logo_url.trim() 
-    : 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/React-icon.svg/1200px-React-icon.svg.png';
-
+  const ticker = config.ticker_text || '';
+  const logoUrl = (config.logo_url && config.logo_url.trim() !== '') ? config.logo_url.trim() : 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/React-icon.svg/1200px-React-icon.svg.png';
+  
+  // Custom Size & Position
   const logoSize = config.logo_size || '120';
   const pos = config.logo_position || 'top-right';
 
-  let overlayPos = 'main_w-overlay_w-30:30'; // top-right default
+  let overlayPos = 'main_w-overlay_w-30:30';
   if (pos === 'top-left') overlayPos = '30:30';
   else if (pos === 'bottom-right') overlayPos = 'main_w-overlay_w-30:main_h-overlay_h-70';
   else if (pos === 'bottom-left') overlayPos = '30:main_h-overlay_h-70';
+
+  let videoFilter = `[1:v]scale=${logoSize}:-1[logo];[0:v][logo]overlay=${overlayPos}[v1]`;
+
+  // Sindhi Text shaping & RTL Alignment Enabled
+  if (program || nextTrk || ticker) {
+    videoFilter += `;[v1]drawtext=text='${program}':x=30:y=30:fontsize=28:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6:text_shaping=1:direction=rtl,` +
+                   `drawtext=text='${nextTrk}':x=30:y=70:fontsize=20:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=4:text_shaping=1:direction=rtl,` +
+                   `drawtext=text='${ticker}':x=-tw+mod(t*140\\,w+tw):y=h-50:fontsize=26:fontcolor=white:box=1:boxcolor=red@0.85:boxborderw=10:text_shaping=1:direction=rtl[outv]`;
+  } else {
+    videoFilter += `[outv]`;
+  }
 
   let ffmpegArgs = [
     '-re',
@@ -101,12 +106,7 @@ function startBroadcaster(config) {
     '-stream_loop', '-1',
     '-i', activeVideoUrl,
     '-i', logoUrl,
-    '-filter_complex',
-    `[1:v]scale=${logoSize}:-1[logo];` +
-    `[0:v][logo]overlay=${overlayPos}[v1];` +
-    `[v1]drawtext=text='${program}':x=30:y=30:fontsize=28:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6,` +
-    `drawtext=text='${nextTrk}':x=30:y=70:fontsize=20:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=4,` +
-    `drawtext=text='${ticker}':x=-tw+mod(t*140\\,w+tw):y=h-50:fontsize=26:fontcolor=white:box=1:boxcolor=red@0.85:boxborderw=10[outv]`,
+    '-filter_complex', videoFilter,
     '-map', '[outv]',
     '-map', '0:a',
     '-c:v', 'libx264',
@@ -126,21 +126,10 @@ function startBroadcaster(config) {
 
   try {
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
-
-    ffmpegProcess.stderr.on('data', (data) => {
-      console.log(`[FFmpeg Logs]: ${data.toString()}`);
-    });
-
-    ffmpegProcess.on('error', (err) => {
-      console.error("❌ FFmpeg Error:", err.message);
-    });
-
-    ffmpegProcess.on('close', (code) => {
-      console.log(`🔴 FFmpeg Stopped with code: ${code}`);
-      ffmpegProcess = null;
-    });
+    ffmpegProcess.stderr.on('data', (data) => console.log(`[FFmpeg]: ${data.toString()}`));
+    ffmpegProcess.on('close', (code) => { ffmpegProcess = null; });
   } catch (e) {
-    console.error("❌ Spawn Error:", e.message);
+    console.error("Spawn Error:", e.message);
   }
 }
 
@@ -148,11 +137,10 @@ function stopBroadcaster() {
   if (ffmpegProcess) {
     ffmpegProcess.kill('SIGKILL');
     ffmpegProcess = null;
-    console.log("🛑 Broadcast Stopped.");
   }
 }
 
 setInterval(checkDatabaseState, 5000);
 
-app.get('/', (req, res) => res.send('Studio Engine Active'));
-app.listen(PORT, () => console.log(`🌐 Server Active on Port ${PORT}`));
+app.get('/', (req, res) => res.send('Engine Active'));
+app.listen(PORT, () => console.log(`Server Active on Port ${PORT}`));
