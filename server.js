@@ -7,15 +7,16 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Supabase Connection
+// Supabase Setup
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://meywyyvqmrnpbzrzzhvm.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let ffmpegProcess = null;
+let lastRestartTrigger = null;
 
-console.log("🚀 Stream Studio Pro Multi-Broadcaster Engine Starting...");
+console.log("🚀 Stream Engine Starting...");
 
 async function checkDatabaseState() {
   try {
@@ -27,19 +28,30 @@ async function checkDatabaseState() {
 
     if (error || !config) return;
 
+    // Track Change Trigger
+    if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
+      lastRestartTrigger = config.restart_trigger;
+      console.log("🔄 Changing track now...");
+      stopBroadcaster();
+      if (config.is_live) {
+        startBroadcaster(config);
+      }
+      return;
+    }
+
     if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Stopping Broadcaster...");
+      console.log("⏹️ Stopping Stream...");
       stopBroadcaster();
     } else if (config.is_live && !ffmpegProcess) {
-      console.log("▶️ Starting Broadcaster...");
+      console.log("▶️ Launching Live Stream...");
       startBroadcaster(config);
     }
   } catch (err) {
-    console.error("Loop Error:", err);
+    console.error("Database Loop Error:", err);
   }
 }
 
-function getLogoOverlayPosition(pos, width = 120) {
+function getLogoOverlayPosition(pos) {
   switch (pos) {
     case 'top-left':
       return 'overlay=20:20';
@@ -58,41 +70,57 @@ function startBroadcaster(config) {
     ? config.playlist 
     : [{ url: 'https://aliakbarshar.github.io/live/TestTrack1.mp4' }];
 
-  // پلي لسٽ لاءِ Concat فائيل تيار ڪرڻ
+  const trackIndex = (config.current_track_index !== undefined && playlist[config.current_track_index]) 
+    ? config.current_track_index 
+    : 0;
+
+  const orderedPlaylist = [...playlist.slice(trackIndex), ...playlist.slice(0, trackIndex)];
+
   const playlistPath = path.join(__dirname, 'playlist.txt');
-  const playlistContent = playlist.map(item => `file '${item.url}'`).join('\n');
+  const playlistContent = orderedPlaylist.map(item => `file '${item.url}'`).join('\n');
   fs.writeFileSync(playlistPath, playlistContent);
 
   const logoUrl = config.logo_url || 'https://aliakbarshar.github.io/live/logo.png';
   const logoPos = config.logo_pos || 'top-right';
-  const logoWidth = config.logo_width || 120; // ڊيفالٽ لوگو سائيز 120px
+  const logoWidth = config.logo_width || 120;
   const tickerText = config.ticker_text || config.overlay_text || '';
 
-  const overlayPosFilter = getLogoOverlayPosition(logoPos, logoWidth);
+  const overlayPosFilter = getLogoOverlayPosition(logoPos);
 
-  // Targets (Facebook + YouTube)
   const outputs = [];
+
+  // FB Key processing - Auto detect if user pasted full URL or just key
   if (config.fb_key && config.fb_key.trim() !== '') {
-    outputs.push(`rtmps://live-api-s.facebook.com:443/rtmp/${config.fb_key.trim()}`);
+    const rawFbKey = config.fb_key.trim();
+    if (rawFbKey.startsWith('rtmp://') || rawFbKey.startsWith('rtmps://')) {
+      outputs.push(rawFbKey);
+    } else {
+      outputs.push(`rtmps://live-api-s.facebook.com:443/rtmp/${rawFbKey}`);
+    }
   }
+
+  // YT Key processing
   if (config.yt_key && config.yt_key.trim() !== '') {
-    outputs.push(`rtmp://a.rtmp.youtube.com/live2/${config.yt_key.trim()}`);
+    const rawYtKey = config.yt_key.trim();
+    if (rawYtKey.startsWith('rtmp://') || rawYtKey.startsWith('rtmps://')) {
+      outputs.push(rawYtKey);
+    } else {
+      outputs.push(`rtmp://a.rtmp.youtube.com/live2/${rawYtKey}`);
+    }
   }
 
   if (outputs.length === 0) {
-    console.error("❌ No Stream Keys Provided for FB or YT!");
+    console.error("❌ No valid Stream Keys found!");
     return;
   }
 
-  console.log(`🎬 Loaded Playlist with ${playlist.length} video(s)`);
-  console.log(`📡 Streaming Active on ${outputs.length} Platform(s)`);
+  console.log(`🎬 Stream Active. Destinations Count: ${outputs.length}`);
 
-  // Video Filters (Logo Scaling, Position & Text Ticker)
   let filterComplex = `[1:v]scale=${logoWidth}:-1[logo];[0:v][logo]${overlayPosFilter}[vlogo]`;
   let finalVideoMap = '[vlogo]';
 
   if (tickerText) {
-    filterComplex += `;[vlogo]drawtext=text='${tickerText}':x=20:y=h-50:fontsize=24:fontcolor=white:box=1:boxcolor=black@0.5[vout]`;
+    filterComplex += `;[vlogo]drawtext=text='${tickerText}':x=w-mod(t*100\\,w+tw):y=h-50:fontsize=24:fontcolor=white:box=1:boxcolor=black@0.6[vout]`;
     finalVideoMap = '[vout]';
   }
 
@@ -108,9 +136,9 @@ function startBroadcaster(config) {
     '-map', '0:a',
     '-c:v', 'libx264',
     '-preset', 'veryfast',
-    '-b:v', '3000k',
-    '-maxrate', '3000k',
-    '-bufsize', '6000k',
+    '-b:v', '2500k',
+    '-maxrate', '2500k',
+    '-bufsize', '5000k',
     '-pix_fmt', 'yuv420p',
     '-g', '60',
     '-c:a', 'aac',
@@ -131,11 +159,11 @@ function startBroadcaster(config) {
   ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
   ffmpegProcess.stderr.on('data', (data) => {
-    console.log(`[FFmpeg]: ${data.toString()}`);
+    console.log(`[FFmpeg Log]: ${data.toString()}`);
   });
 
   ffmpegProcess.on('close', (code) => {
-    console.log(`🔴 FFmpeg Stopped: ${code}`);
+    console.log(`🔴 Stream Stopped with code: ${code}`);
     ffmpegProcess = null;
   });
 }
@@ -144,12 +172,10 @@ function stopBroadcaster() {
   if (ffmpegProcess) {
     ffmpegProcess.kill('SIGKILL');
     ffmpegProcess = null;
-    console.log("🛑 Broadcast Stopped Successfully.");
   }
 }
 
-// 5 سيڪنڊن ۾ ڊيٽابيس چيڪ ڪرڻ
 setInterval(checkDatabaseState, 5000);
 
-app.get('/', (req, res) => res.send('Stream Studio Pro Multi-Broadcaster Active!'));
-app.listen(PORT, () => console.log(`🌐 Server running on port ${PORT}`));
+app.get('/', (req, res) => res.send('Stream Engine Running...'));
+app.listen(PORT, () => console.log(`🌐 App listening on port ${PORT}`));
