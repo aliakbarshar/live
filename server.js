@@ -13,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Live Studio Pro Engine Starting (MB Lateefi Font Enabled)...");
+console.log("🚀 Live Studio Pro Engine Starting (Advanced Overlays & Logo Active)...");
 
 async function checkDatabaseState() {
   try {
@@ -75,18 +75,16 @@ function startBroadcaster(config) {
     }
   }
 
-  // Overlays Data
+  // Overlay Data
   const program = config.program_name || 'لائيِو سنڌي پروگرام';
   const nextTrk = config.next_track || '';
   const ticker = config.ticker_text || 'ڀليڪار! اسٽريم اسٽوڊيو لائيِو براڊڪاسٽنگ';
+  const logoUrl = config.logo_url && config.logo_url.trim() !== '' 
+    ? config.logo_url.trim() 
+    : 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/React-icon.svg/1200px-React-icon.svg.png';
 
-  // Online Web Font CDN for MB Lateefi / Naskh Font
-  const fontUrl = "https://db.onlinewebfonts.com/t/b2570ec402764ecff4b56583fd2370a4.ttf";
-
-  // FFmpeg drawtext with Fontfile and left-to-right ticker
-  let videoFilter = `drawtext=fontfile='${fontUrl}':text='${program}':x=30:y=30:fontsize=32:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6,` +
-                    `drawtext=fontfile='${fontUrl}':text='${nextTrk}':x=30:y=75:fontsize=24:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=4,` +
-                    `drawtext=fontfile='${fontUrl}':text='${ticker}':x=-tw+mod(t*140\\,w+tw):y=h-50:fontsize=30:fontcolor=white:box=1:boxcolor=red@0.85:boxborderw=10`;
+  // Render سرورز تي ڊيفالٽ Naskh/Arabic فونٽ واپرائڻ لاءِ
+  const fontPath = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 
   let ffmpegArgs = [
     '-re',
@@ -97,7 +95,15 @@ function startBroadcaster(config) {
     '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     '-stream_loop', '-1',
     '-i', activeVideoUrl,
-    '-vf', videoFilter,
+    '-i', logoUrl,
+    '-filter_complex',
+    `[1:v]scale=120:-1[logo];` +
+    `[0:v][logo]overlay=main_w-overlay_w-30:30[v1];` +
+    `[v1]drawtext=text='${program}':x=30:y=30:fontsize=28:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6,` +
+    `drawtext=text='${nextTrk}':x=30:y=70:fontsize=20:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=4,` +
+    `drawtext=text='${ticker}':x=-tw+mod(t*140\\,w+tw):y=h-50:fontsize=26:fontcolor=white:box=1:boxcolor=red@0.85:boxborderw=10[outv]`,
+    '-map', '[outv]',
+    '-map', '0:a',
     '-c:v', 'libx264',
     '-preset', 'ultrafast',
     '-tune', 'zerolatency',
