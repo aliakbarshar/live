@@ -90,11 +90,9 @@
     <div class="section">
         <h3>🎵 Continuous Playlist & Live Track Controller</h3>
         
-        <!-- 🔹 شروعاتي ٽريڪ چونڊڻ جو اختيار -->
         <div class="form-group">
             <label style="color: #38bdf8;">🎯 اسٽريم شروع ڪرڻ لاءِ پهريون ٽريڪ چونڊيو (Start Track):</label>
             <select id="startTrackSelect" class="start-track-select" onchange="onStartTrackChange(this.value)">
-                <!-- Dropdown dynamic fill ٿيندو -->
             </select>
         </div>
 
@@ -116,6 +114,7 @@
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let activeTrackIndexGlobal = 0;
+    let isInitialLoad = true;
 
     async function loadSettings() {
         const { data, error } = await _supabase.from('stream_config').select('*').eq('id', 1).single();
@@ -132,23 +131,21 @@
 
             activeTrackIndexGlobal = data.current_track_index || 0;
 
-            const container = document.getElementById('playlistContainer');
-            container.innerHTML = '';
             const list = (data.playlist && data.playlist.length > 0) ? data.playlist : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
 
-            // 🔹 ڊراپ دائون (Dropdown) ۾ پلي لسٽ جون آپشنز ٺاهيو
-            const selectDropdown = document.getElementById('startTrackSelect');
-            selectDropdown.innerHTML = '';
+            // 🔹 صرف پهريون دفعو پلي لسٽ تيار ڪئي ويندي ته جيئن لکيل ڊيٽا بغير گھربل ريفرش جي قائم رهي
+            if (isInitialLoad) {
+                const container = document.getElementById('playlistContainer');
+                container.innerHTML = '';
+                list.forEach((item, index) => {
+                    addPlaylistItem(item.url, index === activeTrackIndexGlobal, index);
+                });
+                isInitialLoad = false;
+            } else {
+                updatePlayingBadges();
+            }
 
-            list.forEach((item, index) => {
-                addPlaylistItem(item.url, index === activeTrackIndexGlobal, index);
-
-                const option = document.createElement('option');
-                option.value = index;
-                option.text = `Track ${index + 1}: ${item.url.substring(item.url.lastIndexOf('/') + 1) || item.url}`;
-                if (index === activeTrackIndexGlobal) option.selected = true;
-                selectDropdown.appendChild(option);
-            });
+            refreshDropdownList();
 
             document.getElementById('status').innerText = "Status: " + (data.is_live ? "🔴 LIVE BROADCASTING" : "⚪ STREAM OFF");
             document.getElementById('status').style.background = data.is_live ? "#15803d" : "#334155";
@@ -163,11 +160,25 @@
         const trackIdx = (index !== null) ? index : container.children.length;
 
         div.innerHTML = `
-            ${isActive ? '<span class="active-badge">▶ Playing Now</span>' : `<button class="btn-play" onclick="playSpecificTrack(${trackIdx})">▶ Switch Now</button>`}
-            <input type="text" class="song-url" value="${url}" placeholder="https://domain.com/video.mp4" onchange="refreshDropdownList()">
+            <div class="badge-holder">${isActive ? '<span class="active-badge">▶ Playing Now</span>' : `<button class="btn-play" onclick="playSpecificTrack(${trackIdx})">▶ Switch Now</button>`}</div>
+            <input type="text" class="song-url" value="${url}" placeholder="https://domain.com/video.mp4" oninput="refreshDropdownList()">
             <button class="btn-remove" onclick="this.parentElement.remove(); refreshDropdownList();">X</button>
         `;
         container.appendChild(div);
+    }
+
+    function updatePlayingBadges() {
+        const items = document.querySelectorAll('.playlist-item');
+        items.forEach((item, index) => {
+            const holder = item.querySelector('.badge-holder');
+            if (holder) {
+                if (index === activeTrackIndexGlobal) {
+                    holder.innerHTML = '<span class="active-badge">▶ Playing Now</span>';
+                } else {
+                    holder.innerHTML = `<button class="btn-play" onclick="playSpecificTrack(${index})">▶ Switch Now</button>`;
+                }
+            }
+        });
     }
 
     function refreshDropdownList() {
@@ -187,9 +198,9 @@
 
     async function onStartTrackChange(selectedIndex) {
         activeTrackIndexGlobal = parseInt(selectedIndex);
+        updatePlayingBadges();
     }
 
-    // 🔹 مينوئل يا لائيِو رن واري وقت ٽريڪ مٽائڻ
     async function playSpecificTrack(index) {
         const urlInputs = document.querySelectorAll('.song-url');
         const playlist = Array.from(urlInputs).map(input => ({ url: input.value.trim() })).filter(item => item.url !== '');
@@ -210,11 +221,11 @@
         if (error) {
             alert('Error switching track: ' + error.message);
         } else {
-            loadSettings();
+            activeTrackIndexGlobal = index;
+            updatePlayingBadges();
         }
     }
 
-    // 🔹 سيٽنگس سيوي ڪرڻ
     async function saveSettings() {
         const fbKey = document.getElementById('fbKey').value.trim();
         const ytKey = document.getElementById('ytKey').value.trim();
@@ -250,11 +261,9 @@
             alert('Error updating Supabase: ' + error.message);
         } else {
             alert('Studio Settings Saved!');
-            loadSettings();
         }
     }
 
-    // 🔹 اسٽريم اسٽارٽ يا اسٽاپ ڪرڻ
     async function toggleStream(status) {
         const fbKey = document.getElementById('fbKey').value.trim();
         const ytKey = document.getElementById('ytKey').value.trim();
@@ -283,7 +292,6 @@
         if (error) alert('Error: ' + error.message);
         else {
             alert(status ? "اسٽريم چالو ڪئي پئي وڃي..." : "اسٽريم بند ڪئي پئي وڃي...");
-            loadSettings();
         }
     }
 
@@ -299,7 +307,8 @@
                     }
                     if (payload.new.current_track_index !== activeTrackIndexGlobal) {
                         activeTrackIndexGlobal = payload.new.current_track_index || 0;
-                        loadSettings();
+                        updatePlayingBadges();
+                        refreshDropdownList();
                     }
                 }
             }
