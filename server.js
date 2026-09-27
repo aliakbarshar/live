@@ -13,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Server Engine Starting (Stable & High Performance)...");
+console.log("🚀 Live Studio Pro Engine Starting...");
 
 async function checkDatabaseState() {
   try {
@@ -27,7 +27,7 @@ async function checkDatabaseState() {
 
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Signal Received! Resetting stream...");
+      console.log("🔄 Settings or Overlay Changed! Resetting Broadcast...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -36,10 +36,10 @@ async function checkDatabaseState() {
     }
 
     if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Stopping Stream...");
+      console.log("⏹️ Live Signal OFF. Stopping...");
       stopBroadcaster();
     } else if (config.is_live && !ffmpegProcess) {
-      console.log("▶️ Starting Stream...");
+      console.log("▶️ Live Signal ON. Launching Studio Broadcaster...");
       startBroadcaster(config);
     }
   } catch (err) {
@@ -50,7 +50,7 @@ async function checkDatabaseState() {
 function startBroadcaster(config) {
   const playlist = (config.playlist && config.playlist.length > 0) 
     ? config.playlist 
-    : [{ url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4' }];
+    : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
 
   const trackIndex = (config.current_track_index !== undefined && playlist[config.current_track_index]) 
     ? config.current_track_index 
@@ -66,7 +66,6 @@ function startBroadcaster(config) {
     return;
   }
 
-  // Auto detect & append proper Facebook or YouTube RTMP/RTMPS URL
   let targetUrl = rawKey;
   if (!rawKey.startsWith('rtmp://') && !rawKey.startsWith('rtmps://')) {
     if (config.fb_key && config.fb_key.trim() !== '') {
@@ -76,7 +75,14 @@ function startBroadcaster(config) {
     }
   }
 
-  console.log(`📡 Streaming to Target: ${targetUrl.substring(0, 30)}...`);
+  // Construct FFmpeg Drawtext & Overlay Filters
+  const program = config.program_name || 'LIVE BROADCAST';
+  const nextTrk = config.next_track || '';
+  const ticker = config.ticker_text || 'Welcome to Stream Studio Live Broadcasting!';
+
+  let videoFilter = `drawtext=text='${program}':x=30:y=30:fontsize=24:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=5,` +
+                    `drawtext=text='${nextTrk}':x=30:y=65:fontsize=18:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=3,` +
+                    `drawtext=text='${ticker}':x=w-mod(max(t-2\\,0)*120\\,w+tw):y=h-40:fontsize=22:fontcolor=white:box=1:boxcolor=red@0.8:boxborderw=8`;
 
   let ffmpegArgs = [
     '-re',
@@ -87,6 +93,7 @@ function startBroadcaster(config) {
     '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     '-stream_loop', '-1',
     '-i', activeVideoUrl,
+    '-vf', videoFilter,
     '-c:v', 'libx264',
     '-preset', 'ultrafast',
     '-tune', 'zerolatency',
@@ -126,11 +133,11 @@ function stopBroadcaster() {
   if (ffmpegProcess) {
     ffmpegProcess.kill('SIGKILL');
     ffmpegProcess = null;
-    console.log("🛑 Stream Engine Stopped.");
+    console.log("🛑 Broadcast Stopped.");
   }
 }
 
 setInterval(checkDatabaseState, 5000);
 
-app.get('/', (req, res) => res.send('Stream Engine Ready'));
-app.listen(PORT, () => console.log(`🌐 Server Running on Port ${PORT}`));
+app.get('/', (req, res) => res.send('Studio Engine Active'));
+app.listen(PORT, () => console.log(`🌐 Server Active on Port ${PORT}`));
