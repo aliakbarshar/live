@@ -3,12 +3,10 @@ const { spawn } = require('child_process');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const ytDlp = require('yt-dlp-exec');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Supabase Connection
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://meywyyvqmrnpbzrzzhvm.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI';
 
@@ -17,7 +15,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Server Engine Starting with YouTube Direct Stream Support...");
+console.log("🚀 Server Engine Ready...");
 
 async function checkDatabaseState() {
   try {
@@ -31,7 +29,7 @@ async function checkDatabaseState() {
 
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Signal Received! Restarting broadcast...");
+      console.log("🔄 Restart Signal Received! Resetting Broadcaster...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -40,60 +38,35 @@ async function checkDatabaseState() {
     }
 
     if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Stopping Broadcaster...");
+      console.log("⏹️ Live signal is OFF. Stopping Broadcaster...");
       stopBroadcaster();
     } else if (config.is_live && !ffmpegProcess) {
-      console.log("▶️ Live Command Detected! Starting Broadcast...");
+      console.log("▶️ Live signal is ON! Starting Broadcaster...");
       startBroadcaster(config);
     }
   } catch (err) {
-    console.error("Database Check Loop Error:", err);
+    console.error("Database Loop Error:", err);
   }
 }
 
-async function resolveDirectUrl(url) {
-  // If URL is YouTube, extract direct stream URL via yt-dlp
-  if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    console.log(`🔍 Resolving YouTube Stream URL for: ${url}`);
-    try {
-      const output = await ytDlp(url, {
-        format: 'best',
-        getUrl: true
-      });
-      return output.trim();
-    } catch (e) {
-      console.error("❌ Failed to resolve YouTube URL:", e.message);
-      return url;
-    }
-  }
-  return url;
-}
-
-async function startBroadcaster(config) {
+function startBroadcaster(config) {
+  // Test fallback track in case playlist is empty
   const playlist = (config.playlist && config.playlist.length > 0) 
     ? config.playlist 
-    : [{ url: 'https://aliakbarshar.github.io/live/TestTrack1.mp4' }];
+    : [{ url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4' }];
 
   const trackIndex = (config.current_track_index !== undefined && playlist[config.current_track_index]) 
     ? config.current_track_index 
     : 0;
 
-  const orderedPlaylist = [...playlist.slice(trackIndex), ...playlist.slice(0, trackIndex)];
+  const activeVideoUrl = playlist[trackIndex].url;
 
-  // Resolve youtube links in playlist
-  let resolvedContent = [];
-  for (let item of orderedPlaylist) {
-    let directUrl = await resolveDirectUrl(item.url);
-    resolvedContent.push(`file '${directUrl}'`);
-  }
-
-  const playlistPath = path.join(__dirname, 'playlist.txt');
-  fs.writeFileSync(playlistPath, resolvedContent.join('\n'));
+  console.log(`🎬 Currently Playing Track URL: ${activeVideoUrl}`);
 
   let rawKey = config.fb_key ? config.fb_key.trim() : (config.yt_key ? config.yt_key.trim() : '');
 
   if (!rawKey) {
-    console.error("❌ ERROR: Stream Key is EMPTY in database!");
+    console.error("❌ ERROR: Stream Key is missing in database!");
     return;
   }
 
@@ -102,18 +75,14 @@ async function startBroadcaster(config) {
     targetUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${rawKey}`;
   }
 
-  console.log(`🎬 Video Playlist Track Index: ${trackIndex}`);
-  console.log(`📡 Pushing Stream to Target...`);
-
+  // FFmpeg Direct Input Streaming
   let ffmpegArgs = [
     '-re',
-    '-protocol_whitelist', 'file,http,https,tcp,tls,crypto',
-    '-f', 'concat',
-    '-safe', '0',
     '-stream_loop', '-1',
-    '-i', playlistPath,
+    '-i', activeVideoUrl,
     '-c:v', 'libx264',
     '-preset', 'veryfast',
+    '-b:v', '2500k',
     '-maxrate', '2500k',
     '-bufsize', '5000k',
     '-pix_fmt', 'yuv420p',
@@ -129,19 +98,19 @@ async function startBroadcaster(config) {
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
     ffmpegProcess.stderr.on('data', (data) => {
-      console.log(`[FFmpeg Logs]: ${data.toString()}`);
+      console.log(`[FFmpeg Log]: ${data.toString()}`);
     });
 
     ffmpegProcess.on('error', (err) => {
-      console.error("❌ FFmpeg Launch Error:", err.message);
+      console.error("❌ FFmpeg Process Error:", err.message);
     });
 
     ffmpegProcess.on('close', (code) => {
-      console.log(`🔴 FFmpeg Process Closed. Exit Code: ${code}`);
+      console.log(`🔴 FFmpeg Closed with Code: ${code}`);
       ffmpegProcess = null;
     });
   } catch (e) {
-    console.error("❌ Spawn Exception:", e.message);
+    console.error("❌ Exception when starting FFmpeg:", e.message);
   }
 }
 
@@ -149,11 +118,11 @@ function stopBroadcaster() {
   if (ffmpegProcess) {
     ffmpegProcess.kill('SIGKILL');
     ffmpegProcess = null;
-    console.log("🛑 Stream Process Terminated.");
+    console.log("🛑 Stream Engine Stopped.");
   }
 }
 
 setInterval(checkDatabaseState, 5000);
 
-app.get('/', (req, res) => res.send('Stream Engine Active'));
-app.listen(PORT, () => console.log(`🌐 Web App Active on Port ${PORT}`));
+app.get('/', (req, res) => res.send('Stream Engine Running Clean'));
+app.listen(PORT, () => console.log(`🌐 Server Running on Port ${PORT}`));
