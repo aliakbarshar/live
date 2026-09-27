@@ -13,6 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 let currentConfig = null;
+let isSwitchingTrack = false;
 
 console.log("🚀 Live Studio Pro Engine Starting...");
 
@@ -30,7 +31,7 @@ async function checkDatabaseState() {
 
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Settings Changed! Restarting Stream...");
+      console.log("🔄 Settings/Track Changed! Restarting Stream...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -41,7 +42,7 @@ async function checkDatabaseState() {
     if (!config.is_live && ffmpegProcess) {
       console.log("⏹️ Live Signal OFF. Stopping...");
       stopBroadcaster();
-    } else if (config.is_live && !ffmpegProcess) {
+    } else if (config.is_live && !ffmpegProcess && !isSwitchingTrack) {
       console.log("▶️ Live Signal ON. Launching Broadcaster...");
       startBroadcaster(config);
     }
@@ -51,17 +52,44 @@ async function checkDatabaseState() {
 }
 
 async function playNextTrackInPlaylist() {
-  if (!currentConfig || !currentConfig.playlist || currentConfig.playlist.length === 0) return;
-  
-  const totalTracks = currentConfig.playlist.length;
-  let nextIndex = ((currentConfig.current_track_index || 0) + 1) % totalTracks;
+  if (isSwitchingTrack) return;
+  isSwitchingTrack = true;
 
-  console.log(`🎵 Track finished. Moving automatically to Track index: ${nextIndex}`);
+  try {
+    if (!currentConfig || !currentConfig.playlist || currentConfig.playlist.length === 0) {
+      isSwitchingTrack = false;
+      return;
+    }
+    
+    const totalTracks = currentConfig.playlist.length;
+    let currentIdx = currentConfig.current_track_index || 0;
+    let nextIndex = (currentIdx + 1) % totalTracks;
 
-  await supabase.from('stream_config').update({
-    current_track_index: nextIndex,
-    restart_trigger: Date.now()
-  }).eq('id', 1);
+    console.log(`🎵 Track finished! Auto-advancing from Track ${currentIdx} to Track ${nextIndex}`);
+
+    const newTrigger = Date.now().toString();
+    lastRestartTrigger = newTrigger;
+
+    const { error } = await supabase.from('stream_config').update({
+      current_track_index: nextIndex,
+      restart_trigger: newTrigger
+    }).eq('id', 1);
+
+    if (error) console.error("Error updating next track index:", error);
+
+    // Refresh local configuration
+    currentConfig.current_track_index = nextIndex;
+    currentConfig.restart_trigger = newTrigger;
+
+    stopBroadcaster();
+    if (currentConfig.is_live) {
+      startBroadcaster(currentConfig);
+    }
+  } catch (e) {
+    console.error("Failed to switch track:", e);
+  } finally {
+    isSwitchingTrack = false;
+  }
 }
 
 function startBroadcaster(config) {
@@ -69,11 +97,13 @@ function startBroadcaster(config) {
     ? config.playlist 
     : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
 
-  const trackIndex = (config.current_track_index !== undefined && playlist[config.current_track_index]) 
-    ? config.current_track_index 
-    : 0;
+  let trackIndex = config.current_track_index || 0;
+  if (trackIndex >= playlist.length) {
+    trackIndex = 0;
+  }
 
   const activeVideoUrl = playlist[trackIndex].url;
+  console.log(`🎬 Playing Track [${trackIndex + 1}/${playlist.length}]: ${activeVideoUrl}`);
 
   let fbKey = config.fb_key ? config.fb_key.trim() : '';
   let ytKey = config.yt_key ? config.yt_key.trim() : '';
@@ -83,17 +113,9 @@ function startBroadcaster(config) {
     return;
   }
 
-  // Format Facebook Target URL
-  let fbTarget = '';
-  if (fbKey) {
-    fbTarget = fbKey.startsWith('rtmp') ? fbKey : `rtmps://live-api-s.facebook.com:443/rtmp/${fbKey}`;
-  }
-
-  // Format YouTube Target URL
-  let ytTarget = '';
-  if (ytKey) {
-    ytTarget = ytKey.startsWith('rtmp') ? ytKey : `rtmp://a.rtmp.youtube.com/live2/${ytKey}`;
-  }
+  // Target Formatting
+  let fbTarget = fbKey ? (fbKey.startsWith('rtmp') ? fbKey : `rtmps://live-api-s.facebook.com:443/rtmp/${fbKey}`) : '';
+  let ytTarget = ytKey ? (ytKey.startsWith('rtmp') ? ytKey : `rtmp://a.rtmp.youtube.com/live2/${ytKey}`) : '';
 
   // Overlay Config
   const program = config.program_name || '';
@@ -121,18 +143,16 @@ function startBroadcaster(config) {
   }
 
   let ffmpegArgs = [
-    '-stream_loop', '-1', // وڊيو کي لڳاتار هلائڻ (Loop) لاءِ
     '-re',
     '-reconnect', '1',
-    '-reconnect_at_eof', '1',
-    '-reconnect_streamed', '1',
-    '-reconnect_delay_max', '2',
+    '-reconnect_at_eof', '0',
+    '-reconnect_streamed', '0',
     '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     '-i', activeVideoUrl,
     '-i', logoUrl,
     '-filter_complex', videoFilter,
     '-map', '[outv]',
-    '-map', '0:a',
+    '-map', '0:a?',
     '-c:v', 'libx264',
     '-preset', 'ultrafast',
     '-tune', 'zerolatency',
@@ -146,12 +166,10 @@ function startBroadcaster(config) {
     '-ar', '44100'
   ];
 
-  // Multi-stream Logic
-  if (fbTarget && ytTarget) {
-    ffmpegArgs.push('-f', 'tee', '-map', '0:v', '-map', '0:a', `[f=flv]${fbTarget}|[f=flv]${ytTarget}`);
-  } else if (fbTarget) {
+  if (fbTarget) {
     ffmpegArgs.push('-f', 'flv', fbTarget);
-  } else if (ytTarget) {
+  }
+  if (ytTarget) {
     ffmpegArgs.push('-f', 'flv', ytTarget);
   }
 
@@ -162,9 +180,8 @@ function startBroadcaster(config) {
     
     ffmpegProcess.on('close', (code) => { 
       ffmpegProcess = null;
-      if (code === 0 || code === null) {
-        playNextTrackInPlaylist();
-      }
+      console.log(`[FFmpeg Closed Code]: ${code}. Triggering next track...`);
+      playNextTrackInPlaylist();
     });
   } catch (e) {
     console.error("Spawn Error:", e.message);
