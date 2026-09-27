@@ -15,6 +15,7 @@
         label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
         input[type="text"], select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: #fff; box-sizing: border-box; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .grid-3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
         .btn { width: 100%; padding: 12px; margin-top: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.2s; }
         .btn-sync { background: #2563eb; color: white; }
         .btn-start { background: #16a34a; color: white; }
@@ -48,9 +49,24 @@
     <!-- Studio Overlays & Graphic Controls -->
     <div class="section">
         <h3>🎨 Live Studio Overlays & Graphics</h3>
-        <div class="form-group">
-            <label>لوگو تصوير جي ڊائريڪٽ لنڪ (PNG/JPG URL):</label>
-            <input type="text" id="logoUrl" placeholder="https://domain.com/logo.png">
+        <div class="grid-3">
+            <div class="form-group">
+                <label>لوگو تصوير جي ڊائريڪٽ لنڪ (PNG/JPG URL):</label>
+                <input type="text" id="logoUrl" placeholder="https://domain.com/logo.png">
+            </div>
+            <div class="form-group">
+                <label>لوگو سائيز (Width in px):</label>
+                <input type="text" id="logoSize" placeholder="120">
+            </div>
+            <div class="form-group">
+                <label>لوگو پوزيشن:</label>
+                <select id="logoPosition">
+                    <option value="top-right">Top Right (ساڄي مٿان)</option>
+                    <option value="top-left">Top Left (کاٻي مٿان)</option>
+                    <option value="bottom-right">Bottom Right (ساڄي هيٺ)</option>
+                    <option value="bottom-left">Bottom Left (کاٻي هيٺ)</option>
+                </select>
+            </div>
         </div>
         <div class="grid-2">
             <div class="form-group">
@@ -110,6 +126,8 @@
             
             // Studio Overlays
             document.getElementById('logoUrl').value = data.logo_url || '';
+            document.getElementById('logoSize').value = data.logo_size || '120';
+            document.getElementById('logoPosition').value = data.logo_position || 'top-right';
             document.getElementById('programName').value = data.program_name || '';
             document.getElementById('nextTrack').value = data.next_track || '';
             document.getElementById('tickerText').value = data.ticker_text || '';
@@ -150,6 +168,8 @@
         const fbKey = document.getElementById('fbKey').value.trim();
         const ytKey = document.getElementById('ytKey').value.trim();
         const logoUrl = document.getElementById('logoUrl').value.trim();
+        const logoSize = document.getElementById('logoSize').value.trim() || '120';
+        const logoPosition = document.getElementById('logoPosition').value;
         const programName = document.getElementById('programName').value.trim();
         const nextTrack = document.getElementById('nextTrack').value.trim();
         const tickerText = document.getElementById('tickerText').value.trim();
@@ -161,6 +181,8 @@
             fb_key: fbKey,
             yt_key: ytKey,
             logo_url: logoUrl,
+            logo_size: logoSize,
+            logo_position: logoPosition,
             program_name: programName,
             next_track: nextTrack,
             ticker_text: tickerText,
