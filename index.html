@@ -21,11 +21,11 @@
         .btn-start { background: #16a34a; color: white; }
         .btn-stop { background: #dc2626; color: white; }
         .btn-add { background: #0891b2; color: white; padding: 8px; font-size: 14px; margin-top: 5px; }
-        .btn-switch { background: #d97706; color: white; padding: 10px; font-size: 14px; }
         #status { margin-top: 15px; text-align: center; font-weight: bold; padding: 12px; border-radius: 6px; font-size: 18px; }
-        .playlist-item { display: flex; gap: 10px; margin-bottom: 5px; align-items: center; }
+        .playlist-item { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; }
         .playlist-item input { flex: 1; }
         .playlist-item button { background: #e11d48; color: white; border: none; border-radius: 6px; padding: 10px 14px; cursor: pointer; }
+        .active-badge { background: #10b981; color: #000; padding: 6px 10px; font-weight: bold; border-radius: 4px; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -84,23 +84,9 @@
         </div>
     </div>
 
-    <!-- Track Switcher -->
-    <div class="section">
-        <h3>⚡ Direct Track Switcher</h3>
-        <div class="grid-2">
-            <div class="form-group">
-                <label>Select Track to Play Now:</label>
-                <select id="activeTrackSelect"></select>
-            </div>
-            <div class="form-group" style="display: flex; align-items: flex-end;">
-                <button class="btn btn-switch" onclick="switchActiveTrack()">▶️ Play Selected Track Now</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Playlist -->
     <div class="section">
-        <h3>🎵 Playlist / Video List (Auto Loop Active)</h3>
+        <h3>🎵 Continuous Playlist (وڊيو پاڻمرادو پويان هلندي)</h3>
         <div id="playlistContainer"></div>
         <button class="btn btn-add" onclick="addPlaylistItem()">+ Add Video URL</button>
     </div>
@@ -134,17 +120,10 @@
             const container = document.getElementById('playlistContainer');
             container.innerHTML = '';
             const list = (data.playlist && data.playlist.length > 0) ? data.playlist : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
-            
-            const selectDropdown = document.getElementById('activeTrackSelect');
-            selectDropdown.innerHTML = '';
+            const currentIdx = data.current_track_index || 0;
 
             list.forEach((item, index) => {
-                addPlaylistItem(item.url);
-                const opt = document.createElement('option');
-                opt.value = index;
-                opt.text = `Track ${index + 1}: ${item.url.substring(item.url.lastIndexOf('/') + 1)}`;
-                if((data.current_track_index || 0) === index) opt.selected = true;
-                selectDropdown.appendChild(opt);
+                addPlaylistItem(item.url, index === currentIdx);
             });
 
             document.getElementById('status').innerText = "Status: " + (data.is_live ? "🔴 LIVE BROADCASTING" : "⚪ STREAM OFF");
@@ -152,11 +131,12 @@
         }
     }
 
-    function addPlaylistItem(url = '') {
+    function addPlaylistItem(url = '', isActive = false) {
         const container = document.getElementById('playlistContainer');
         const div = document.createElement('div');
         div.className = 'playlist-item';
         div.innerHTML = `
+            ${isActive ? '<span class="active-badge">▶ Playing Now</span>' : ''}
             <input type="text" class="song-url" value="${url}" placeholder="https://domain.com/video.mp4">
             <button onclick="this.parentElement.remove()">X</button>
         `;
@@ -192,21 +172,7 @@
         if (error) {
             alert('Error updating Supabase: ' + error.message);
         } else {
-            alert('Studio Settings & Overlays Saved Successfully!');
-            loadSettings();
-        }
-    }
-
-    async function switchActiveTrack() {
-        const selectedIndex = parseInt(document.getElementById('activeTrackSelect').value);
-        const { error } = await _supabase.from('stream_config').update({ 
-            current_track_index: selectedIndex,
-            restart_trigger: Date.now() 
-        }).eq('id', 1);
-
-        if (error) alert('Error: ' + error.message);
-        else {
-            alert('Track Switch Signal Sent!');
+            alert('Studio Settings & Playlist Saved Successfully!');
             loadSettings();
         }
     }
@@ -233,6 +199,8 @@
     }
 
     loadSettings();
+    // Auto refresh settings every 10 seconds to show active playing track badge
+    setInterval(loadSettings, 10000);
 </script>
 
 </body>
