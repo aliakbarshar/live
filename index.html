@@ -120,7 +120,7 @@
             document.getElementById('logoUrl').value = data.logo_url || '';
             document.getElementById('logoWidth').value = data.logo_width || 120;
             document.getElementById('logoPos').value = data.logo_pos || 'top-right';
-            document.getElementById('tickerText').value = data.ticker_text || data.overlay_text || '';
+            document.getElementById('tickerText').value = data.ticker_text || '';
             
             currentTrackIndex = data.current_track_index || 0;
 
@@ -174,7 +174,6 @@
             logo_width: logoWidth,
             logo_pos: logoPos,
             ticker_text: tickerText,
-            overlay_text: tickerText,
             playlist: playlist
         }).eq('id', 1);
 
