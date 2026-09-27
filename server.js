@@ -75,16 +75,24 @@ function startBroadcaster(config) {
 
   const activeVideoUrl = playlist[trackIndex].url;
 
-  let rawKey = config.fb_key ? config.fb_key.trim() : (config.yt_key ? config.yt_key.trim() : '');
-  if (!rawKey) return;
+  let fbKey = config.fb_key ? config.fb_key.trim() : '';
+  let ytKey = config.yt_key ? config.yt_key.trim() : '';
 
-  let targetUrl = rawKey;
-  if (!rawKey.startsWith('rtmp://') && !rawKey.startsWith('rtmps://')) {
-    if (config.fb_key && config.fb_key.trim() !== '') {
-      targetUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${config.fb_key.trim()}`;
-    } else if (config.yt_key && config.yt_key.trim() !== '') {
-      targetUrl = `rtmp://a.rtmp.youtube.com/live2/${config.yt_key.trim()}`;
-    }
+  if (!fbKey && !ytKey) {
+    console.log("❌ No Stream Keys provided!");
+    return;
+  }
+
+  // Format Facebook Target URL
+  let fbTarget = '';
+  if (fbKey) {
+    fbTarget = fbKey.startsWith('rtmp') ? fbKey : `rtmps://live-api-s.facebook.com:443/rtmp/${fbKey}`;
+  }
+
+  // Format YouTube Target URL
+  let ytTarget = '';
+  if (ytKey) {
+    ytTarget = ytKey.startsWith('rtmp') ? ytKey : `rtmp://a.rtmp.youtube.com/live2/${ytKey}`;
   }
 
   // Overlay Config
@@ -102,8 +110,6 @@ function startBroadcaster(config) {
   else if (pos === 'bottom-left') overlayPos = '30:main_h-overlay_h-70';
 
   let videoFilter = `[1:v]scale=${logoSize}:-1[logo];[0:v][logo]overlay=${overlayPos}[v1]`;
-  
-  // Cleaned Font Options (Compatible with Render FFmpeg)
   const fontOpt = "fontfile='./Lateef-Regular.ttf'";
 
   if (program || nextTrk || ticker) {
@@ -136,10 +142,17 @@ function startBroadcaster(config) {
     '-g', '60',
     '-c:a', 'aac',
     '-b:a', '128k',
-    '-ar', '44100',
-    '-f', 'flv',
-    targetUrl
+    '-ar', '44100'
   ];
+
+  // Multi-stream logic using FLV Tee
+  if (fbTarget && ytTarget) {
+    ffmpegArgs.push('-f', 'tee', '-map', '0:v', '-map', '0:a', `[f=flv]${fbTarget}|[f=flv]${ytTarget}`);
+  } else if (fbTarget) {
+    ffmpegArgs.push('-f', 'flv', fbTarget);
+  } else if (ytTarget) {
+    ffmpegArgs.push('-f', 'flv', ytTarget);
+  }
 
   try {
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
