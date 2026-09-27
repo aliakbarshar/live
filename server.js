@@ -81,9 +81,9 @@ function startBroadcaster(config) {
   let targetUrl = rawKey;
   if (!rawKey.startsWith('rtmp://') && !rawKey.startsWith('rtmps://')) {
     if (config.fb_key && config.fb_key.trim() !== '') {
-      targetUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${rawKey}`;
-    } else {
-      targetUrl = `rtmp://a.rtmp.youtube.com/live2/${rawKey}`;
+      targetUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${config.fb_key.trim()}`;
+    } else if (config.yt_key && config.yt_key.trim() !== '') {
+      targetUrl = `rtmp://a.rtmp.youtube.com/live2/${config.yt_key.trim()}`;
     }
   }
 
@@ -102,7 +102,9 @@ function startBroadcaster(config) {
   else if (pos === 'bottom-left') overlayPos = '30:main_h-overlay_h-70';
 
   let videoFilter = `[1:v]scale=${logoSize}:-1[logo];[0:v][logo]overlay=${overlayPos}[v1]`;
-  const fontOpt = "fontfile='./Lateef-Regular.ttf':text_shaping=1:direction=rtl";
+  
+  // Cleaned Font Options (Compatible with Render FFmpeg)
+  const fontOpt = "fontfile='./Lateef-Regular.ttf'";
 
   if (program || nextTrk || ticker) {
     videoFilter += `;[v1]drawtext=text='${program}':x=30:y=30:fontsize=28:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6:${fontOpt},` +
@@ -146,7 +148,6 @@ function startBroadcaster(config) {
     
     ffmpegProcess.on('close', (code) => { 
       ffmpegProcess = null;
-      // Normal closure means video ended, switch to next track automatically
       if (code === 0 || code === null) {
         playNextTrackInPlaylist();
       }
