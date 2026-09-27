@@ -133,7 +133,6 @@
 
             const list = (data.playlist && data.playlist.length > 0) ? data.playlist : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
 
-            // 🔹 صرف پهريون دفعو پلي لسٽ تيار ڪئي ويندي ته جيئن لکيل ڊيٽا بغير گھربل ريفرش جي قائم رهي
             if (isInitialLoad) {
                 const container = document.getElementById('playlistContainer');
                 container.innerHTML = '';
@@ -295,7 +294,7 @@
         }
     }
 
-    // 🔹 Realtime Auto-Sync
+    // Realtime Auto-Sync
     _supabase.channel('schema-db-changes')
         .on(
             'postgres_changes',
