@@ -1,8 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { spawn } = require('child_process');
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -15,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Server Engine Ready...");
+console.log("🚀 Live Stream Engine starting with Facebook Fix...");
 
 async function checkDatabaseState() {
   try {
@@ -29,7 +27,7 @@ async function checkDatabaseState() {
 
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Restart Signal Received! Resetting Broadcaster...");
+      console.log("🔄 Restart Signal Detected! Resetting Stream...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -38,19 +36,18 @@ async function checkDatabaseState() {
     }
 
     if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Live signal is OFF. Stopping Broadcaster...");
+      console.log("⏹️ Live signal is OFF. Stopping stream...");
       stopBroadcaster();
     } else if (config.is_live && !ffmpegProcess) {
-      console.log("▶️ Live signal is ON! Starting Broadcaster...");
+      console.log("▶️ Live signal is ON! Starting Facebook Broadcast...");
       startBroadcaster(config);
     }
   } catch (err) {
-    console.error("Database Loop Error:", err);
+    console.error("Database Check Error:", err);
   }
 }
 
 function startBroadcaster(config) {
-  // Test fallback track in case playlist is empty
   const playlist = (config.playlist && config.playlist.length > 0) 
     ? config.playlist 
     : [{ url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4' }];
@@ -60,25 +57,25 @@ function startBroadcaster(config) {
     : 0;
 
   const activeVideoUrl = playlist[trackIndex].url;
-
-  console.log(`🎬 Currently Playing Track URL: ${activeVideoUrl}`);
+  console.log(`🎬 Video URL to Play: ${activeVideoUrl}`);
 
   let rawKey = config.fb_key ? config.fb_key.trim() : (config.yt_key ? config.yt_key.trim() : '');
 
   if (!rawKey) {
-    console.error("❌ ERROR: Stream Key is missing in database!");
+    console.error("❌ ERROR: FB Stream Key is Empty!");
     return;
   }
 
+  // Construct Full Facebook RTMPS URL
   let targetUrl = rawKey;
   if (!rawKey.startsWith('rtmp://') && !rawKey.startsWith('rtmps://')) {
     targetUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${rawKey}`;
   }
 
-  // FFmpeg Direct Input Streaming
+  console.log("📡 Streaming directly to Facebook Live Server...");
+
   let ffmpegArgs = [
     '-re',
-    '-stream_loop', '-1',
     '-i', activeVideoUrl,
     '-c:v', 'libx264',
     '-preset', 'veryfast',
@@ -98,19 +95,19 @@ function startBroadcaster(config) {
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
     ffmpegProcess.stderr.on('data', (data) => {
-      console.log(`[FFmpeg Log]: ${data.toString()}`);
+      console.log(`[FFmpeg]: ${data.toString()}`);
     });
 
     ffmpegProcess.on('error', (err) => {
-      console.error("❌ FFmpeg Process Error:", err.message);
+      console.error("❌ FFmpeg Error:", err.message);
     });
 
     ffmpegProcess.on('close', (code) => {
-      console.log(`🔴 FFmpeg Closed with Code: ${code}`);
+      console.log(`🔴 FFmpeg Stopped with Exit Code: ${code}`);
       ffmpegProcess = null;
     });
   } catch (e) {
-    console.error("❌ Exception when starting FFmpeg:", e.message);
+    console.error("❌ Spawn Error:", e.message);
   }
 }
 
@@ -118,11 +115,11 @@ function stopBroadcaster() {
   if (ffmpegProcess) {
     ffmpegProcess.kill('SIGKILL');
     ffmpegProcess = null;
-    console.log("🛑 Stream Engine Stopped.");
+    console.log("🛑 Stream Stopped.");
   }
 }
 
 setInterval(checkDatabaseState, 5000);
 
-app.get('/', (req, res) => res.send('Stream Engine Running Clean'));
+app.get('/', (req, res) => res.send('Stream Engine Ready'));
 app.listen(PORT, () => console.log(`🌐 Server Running on Port ${PORT}`));
