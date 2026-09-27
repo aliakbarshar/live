@@ -110,6 +110,8 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    let currentTrackIndex = 0;
+
     async function loadSettings() {
         const { data, error } = await _supabase.from('stream_config').select('*').eq('id', 1).single();
         if (data) {
@@ -118,7 +120,9 @@
             document.getElementById('logoUrl').value = data.logo_url || '';
             document.getElementById('logoWidth').value = data.logo_width || 120;
             document.getElementById('logoPos').value = data.logo_pos || 'top-right';
-            document.getElementById('tickerText').value = data.ticker_text || '';
+            document.getElementById('tickerText').value = data.ticker_text || data.overlay_text || '';
+            
+            currentTrackIndex = data.current_track_index || 0;
 
             const container = document.getElementById('playlistContainer');
             container.innerHTML = '';
@@ -132,7 +136,7 @@
                 const opt = document.createElement('option');
                 opt.value = index;
                 opt.text = `Track ${index + 1}: ${item.url.substring(item.url.lastIndexOf('/') + 1)}`;
-                if(data.current_track_index === index) opt.selected = true;
+                if(currentTrackIndex === index) opt.selected = true;
                 selectDropdown.appendChild(opt);
             });
 
@@ -163,16 +167,16 @@
         const urlInputs = document.querySelectorAll('.song-url');
         const playlist = Array.from(urlInputs).map(input => ({ url: input.value.trim() })).filter(item => item.url !== '');
 
-        const { error } = await _supabase.from('stream_config').upsert({
-            id: 1,
+        const { error } = await _supabase.from('stream_config').update({
             fb_key: fbKey,
             yt_key: ytKey,
             logo_url: logoUrl,
             logo_width: logoWidth,
             logo_pos: logoPos,
             ticker_text: tickerText,
+            overlay_text: tickerText,
             playlist: playlist
-        });
+        }).eq('id', 1);
 
         if (error) {
             alert('Error saving settings: ' + error.message);
@@ -207,7 +211,11 @@
             }
         }
 
-        const { error } = await _supabase.from('stream_config').update({ is_live: status }).eq('id', 1);
+        const { error } = await _supabase.from('stream_config').update({ 
+            is_live: status,
+            restart_trigger: Date.now() 
+        }).eq('id', 1);
+
         if (error) {
             alert('Status Error: ' + error.message);
         } else {
