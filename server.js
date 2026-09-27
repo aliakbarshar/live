@@ -3,6 +3,7 @@ const { spawn } = require('child_process');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const ytDlp = require('yt-dlp-exec');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -16,7 +17,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Server Engine Starting with HTTPS Protocol Whitelist Fix...");
+console.log("🚀 Server Engine Starting with YouTube Direct Stream Support...");
 
 async function checkDatabaseState() {
   try {
@@ -28,7 +29,6 @@ async function checkDatabaseState() {
 
     if (error || !config) return;
 
-    // Trigger Restart Signal
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
       console.log("🔄 Signal Received! Restarting broadcast...");
@@ -51,7 +51,25 @@ async function checkDatabaseState() {
   }
 }
 
-function startBroadcaster(config) {
+async function resolveDirectUrl(url) {
+  // If URL is YouTube, extract direct stream URL via yt-dlp
+  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    console.log(`🔍 Resolving YouTube Stream URL for: ${url}`);
+    try {
+      const output = await ytDlp(url, {
+        format: 'best',
+        getUrl: true
+      });
+      return output.trim();
+    } catch (e) {
+      console.error("❌ Failed to resolve YouTube URL:", e.message);
+      return url;
+    }
+  }
+  return url;
+}
+
+async function startBroadcaster(config) {
   const playlist = (config.playlist && config.playlist.length > 0) 
     ? config.playlist 
     : [{ url: 'https://aliakbarshar.github.io/live/TestTrack1.mp4' }];
@@ -62,9 +80,15 @@ function startBroadcaster(config) {
 
   const orderedPlaylist = [...playlist.slice(trackIndex), ...playlist.slice(0, trackIndex)];
 
+  // Resolve youtube links in playlist
+  let resolvedContent = [];
+  for (let item of orderedPlaylist) {
+    let directUrl = await resolveDirectUrl(item.url);
+    resolvedContent.push(`file '${directUrl}'`);
+  }
+
   const playlistPath = path.join(__dirname, 'playlist.txt');
-  const playlistContent = orderedPlaylist.map(item => `file '${item.url}'`).join('\n');
-  fs.writeFileSync(playlistPath, playlistContent);
+  fs.writeFileSync(playlistPath, resolvedContent.join('\n'));
 
   let rawKey = config.fb_key ? config.fb_key.trim() : (config.yt_key ? config.yt_key.trim() : '');
 
@@ -73,7 +97,6 @@ function startBroadcaster(config) {
     return;
   }
 
-  // Construct Standard FB RTMP URL
   let targetUrl = rawKey;
   if (!rawKey.startsWith('rtmp://') && !rawKey.startsWith('rtmps://')) {
     targetUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${rawKey}`;
@@ -82,7 +105,6 @@ function startBroadcaster(config) {
   console.log(`🎬 Video Playlist Track Index: ${trackIndex}`);
   console.log(`📡 Pushing Stream to Target...`);
 
-  // Fixed FFmpeg Command with Protocol Whitelist for HTTPS / HTTP / TLS
   let ffmpegArgs = [
     '-re',
     '-protocol_whitelist', 'file,http,https,tcp,tls,crypto',
