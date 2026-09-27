@@ -13,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Server Engine Ready...");
+console.log("🚀 Server Engine Starting...");
 
 async function checkDatabaseState() {
   try {
@@ -27,7 +27,7 @@ async function checkDatabaseState() {
 
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Restart Signal Received!");
+      console.log("🔄 Signal Received! Resetting stream...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -43,7 +43,7 @@ async function checkDatabaseState() {
       startBroadcaster(config);
     }
   } catch (err) {
-    console.error("Database Check Error:", err);
+    console.error("Database Loop Error:", err);
   }
 }
 
@@ -57,12 +57,12 @@ function startBroadcaster(config) {
     : 0;
 
   const activeVideoUrl = playlist[trackIndex].url;
-  console.log(`🎬 Stream Video URL: ${activeVideoUrl}`);
+  console.log(`🎬 Stream URL: ${activeVideoUrl}`);
 
   let rawKey = config.fb_key ? config.fb_key.trim() : (config.yt_key ? config.yt_key.trim() : '');
 
   if (!rawKey) {
-    console.error("❌ ERROR: Stream Key is missing!");
+    console.error("❌ ERROR: FB Key is missing!");
     return;
   }
 
@@ -101,11 +101,11 @@ function startBroadcaster(config) {
     });
 
     ffmpegProcess.on('close', (code) => {
-      console.log(`🔴 FFmpeg Closed. Code: ${code}`);
+      console.log(`🔴 FFmpeg Stopped with code: ${code}`);
       ffmpegProcess = null;
     });
   } catch (e) {
-    console.error("❌ Exception starting FFmpeg:", e.message);
+    console.error("❌ Spawn Error:", e.message);
   }
 }
 
@@ -113,11 +113,11 @@ function stopBroadcaster() {
   if (ffmpegProcess) {
     ffmpegProcess.kill('SIGKILL');
     ffmpegProcess = null;
-    console.log("🛑 Broadcast Stopped.");
+    console.log("🛑 Stream Engine Stopped.");
   }
 }
 
 setInterval(checkDatabaseState, 5000);
 
-app.get('/', (req, res) => res.send('Stream Engine Active'));
-app.listen(PORT, () => console.log(`🌐 Web App Active on Port ${PORT}`));
+app.get('/', (req, res) => res.send('Stream Engine Ready'));
+app.listen(PORT, () => console.log(`🌐 Server Running on Port ${PORT}`));
