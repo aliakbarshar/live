@@ -1,6 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { spawn } = require('child_process');
 const express = require('express');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -15,7 +16,17 @@ let lastRestartTrigger = null;
 let currentConfig = null;
 let isTrackChanging = false;
 
+// 🔹 توهان جي اپلوڊ ڪيل فونٽ فائل جو پورو نالو
+const FONT_PATH = './Lateef-Regular.ttf.otf';
+
 console.log("🚀 Live Studio Pro Engine Starting...");
+
+// 🔹 چيڪ ڪريو ته فونٽ فائل سرور تي موجود آهي يا نه
+if (fs.existsSync(FONT_PATH)) {
+    console.log("✅ Sindhi Font File Found:", FONT_PATH);
+} else {
+    console.warn("⚠️ Warning: Font file 'Lateef-Regular.ttf.otf' not found in root directory! Please make sure it is committed to GitHub.");
+}
 
 async function checkDatabaseState() {
   try {
@@ -120,19 +131,26 @@ function startBroadcaster(config) {
   else if (pos === 'bottom-left') overlayPos = '30:main_h-overlay_h-70';
 
   let videoFilter = `[1:v]scale=${logoSize}:-1[logo];[0:v][logo]overlay=${overlayPos}[v1]`;
-  const fontOpt = "fontfile='./Lateef-Regular.ttf'";
+  
+  // 🔹 فونٽ فائل جو انتخاب (جيڪڏهن اپلوڊ ٿيل فائل ملندي ته اها هلندي)
+  const fontOpt = fs.existsSync(FONT_PATH) 
+    ? `fontfile='${FONT_PATH}'` 
+    : `font='DejaVu Sans'`;
 
   if (program || nextTrk || ticker) {
-    videoFilter += `;[v1]drawtext=text='${program}':x=30:y=30:fontsize=28:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6:${fontOpt},` +
-                   `drawtext=text='${nextTrk}':x=30:y=70:fontsize=20:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=4:${fontOpt},` +
-                   `drawtext=text='${ticker}':x=-tw+mod(t*140\\,w+tw):y=h-50:fontsize=26:fontcolor=white:box=1:boxcolor=red@0.85:boxborderw=10:${fontOpt}[outv]`;
+    videoFilter += `;[v1]drawtext=text='${program}':x=30:y=30:fontsize=32:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6:${fontOpt},` +
+                   `drawtext=text='${nextTrk}':x=30:y=75:fontsize=22:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=4:${fontOpt},` +
+                   `drawtext=text='${ticker}':x=-tw+mod(t*140\\,w+tw):y=h-50:fontsize=28:fontcolor=white:box=1:boxcolor=red@0.85:boxborderw=10:${fontOpt}[outv]`;
   } else {
     videoFilter += `[outv]`;
   }
 
   let ffmpegArgs = [
     '-re',
-    '-reconnect', '0',
+    '-reconnect', '1',
+    '-reconnect_at_eof', '1',
+    '-reconnect_streamed', '1',
+    '-reconnect_delay_max', '5',
     '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     '-i', activeVideoUrl,
     '-i', logoUrl,
