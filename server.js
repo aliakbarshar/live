@@ -121,6 +121,7 @@ function startBroadcaster(config) {
   }
 
   let ffmpegArgs = [
+    '-stream_loop', '-1', // وڊيو کي لڳاتار هلائڻ (Loop) لاءِ
     '-re',
     '-reconnect', '1',
     '-reconnect_at_eof', '1',
@@ -145,7 +146,7 @@ function startBroadcaster(config) {
     '-ar', '44100'
   ];
 
-  // Multi-stream logic using FLV Tee
+  // Multi-stream Logic
   if (fbTarget && ytTarget) {
     ffmpegArgs.push('-f', 'tee', '-map', '0:v', '-map', '0:a', `[f=flv]${fbTarget}|[f=flv]${ytTarget}`);
   } else if (fbTarget) {
