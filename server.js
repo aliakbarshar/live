@@ -16,7 +16,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Server Engine Starting with Facebook RTMP Fix...");
+console.log("🚀 Server Engine Starting with HTTPS Protocol Whitelist Fix...");
 
 async function checkDatabaseState() {
   try {
@@ -26,12 +26,9 @@ async function checkDatabaseState() {
       .eq('id', 1)
       .single();
 
-    if (error || !config) {
-      console.log("⚠️ Database Fetch Error or Empty Config");
-      return;
-    }
+    if (error || !config) return;
 
-    // Trigger Signal Restart
+    // Trigger Restart Signal
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
       console.log("🔄 Signal Received! Restarting broadcast...");
@@ -43,7 +40,7 @@ async function checkDatabaseState() {
     }
 
     if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Stopping Broadcaster via Switch...");
+      console.log("⏹️ Stopping Broadcaster...");
       stopBroadcaster();
     } else if (config.is_live && !ffmpegProcess) {
       console.log("▶️ Live Command Detected! Starting Broadcast...");
@@ -79,16 +76,16 @@ function startBroadcaster(config) {
   // Construct Standard FB RTMP URL
   let targetUrl = rawKey;
   if (!rawKey.startsWith('rtmp://') && !rawKey.startsWith('rtmps://')) {
-    // Standard Facebook RTMPS Endpoint
     targetUrl = `rtmps://live-api-s.facebook.com:443/rtmp/${rawKey}`;
   }
 
   console.log(`🎬 Video Playlist Track Index: ${trackIndex}`);
-  console.log(`📡 Pushing Stream to Target: ${targetUrl.substring(0, 35)}...`);
+  console.log(`📡 Pushing Stream to Target...`);
 
-  // Robust FFmpeg Flags for Facebook Streaming
+  // Fixed FFmpeg Command with Protocol Whitelist for HTTPS / HTTP / TLS
   let ffmpegArgs = [
     '-re',
+    '-protocol_whitelist', 'file,http,https,tcp,tls,crypto',
     '-f', 'concat',
     '-safe', '0',
     '-stream_loop', '-1',
@@ -114,7 +111,7 @@ function startBroadcaster(config) {
     });
 
     ffmpegProcess.on('error', (err) => {
-      console.error("❌ FFmpeg Failed to Launch (Is FFmpeg installed on Render?):", err.message);
+      console.error("❌ FFmpeg Launch Error:", err.message);
     });
 
     ffmpegProcess.on('close', (code) => {
@@ -136,5 +133,5 @@ function stopBroadcaster() {
 
 setInterval(checkDatabaseState, 5000);
 
-app.get('/', (req, res) => res.send('Stream Engine Core Active'));
+app.get('/', (req, res) => res.send('Stream Engine Active'));
 app.listen(PORT, () => console.log(`🌐 Web App Active on Port ${PORT}`));
