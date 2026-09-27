@@ -100,7 +100,7 @@
 
     <!-- Playlist -->
     <div class="section">
-        <h3>🎵 Playlist / Video List</h3>
+        <h3>🎵 Playlist / Video List (Auto Loop Active)</h3>
         <div id="playlistContainer"></div>
         <button class="btn btn-add" onclick="addPlaylistItem()">+ Add Video URL</button>
     </div>
@@ -124,7 +124,6 @@
             document.getElementById('fbKey').value = data.fb_key || '';
             document.getElementById('ytKey').value = data.yt_key || '';
             
-            // Studio Overlays
             document.getElementById('logoUrl').value = data.logo_url || '';
             document.getElementById('logoSize').value = data.logo_size || '120';
             document.getElementById('logoPosition').value = data.logo_position || 'top-right';
