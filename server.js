@@ -87,11 +87,13 @@ function startBroadcaster(config) {
 
   let videoFilter = `[1:v]scale=${logoSize}:-1[logo];[0:v][logo]overlay=${overlayPos}[v1]`;
 
-  // Sindhi Text shaping & RTL Alignment Enabled
+  // Font options for correct Sindhi rendering
+  const fontOpt = "fontfile='./Lateef-Regular.ttf':text_shaping=1:direction=rtl";
+
   if (program || nextTrk || ticker) {
-    videoFilter += `;[v1]drawtext=text='${program}':x=30:y=30:fontsize=28:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6:text_shaping=1:direction=rtl,` +
-                   `drawtext=text='${nextTrk}':x=30:y=70:fontsize=20:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=4:text_shaping=1:direction=rtl,` +
-                   `drawtext=text='${ticker}':x=-tw+mod(t*140\\,w+tw):y=h-50:fontsize=26:fontcolor=white:box=1:boxcolor=red@0.85:boxborderw=10:text_shaping=1:direction=rtl[outv]`;
+    videoFilter += `;[v1]drawtext=text='${program}':x=30:y=30:fontsize=28:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6:${fontOpt},` +
+                   `drawtext=text='${nextTrk}':x=30:y=70:fontsize=20:fontcolor=yellow:box=1:boxcolor=black@0.4:boxborderw=4:${fontOpt},` +
+                   `drawtext=text='${ticker}':x=-tw+mod(t*140\\,w+tw):y=h-50:fontsize=26:fontcolor=white:box=1:boxcolor=red@0.85:boxborderw=10:${fontOpt}[outv]`;
   } else {
     videoFilter += `[outv]`;
   }
