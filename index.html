@@ -27,6 +27,7 @@
         .playlist-item button.btn-play { background: #10b981; color: #000; font-weight: bold; border: none; border-radius: 6px; padding: 10px 12px; cursor: pointer; }
         .playlist-item button.btn-remove { background: #e11d48; color: white; border: none; border-radius: 6px; padding: 10px 12px; cursor: pointer; }
         .active-badge { background: #10b981; color: #000; padding: 6px 10px; font-weight: bold; border-radius: 4px; font-size: 12px; white-space: nowrap; }
+        .start-track-select { background: #0f172a; color: #38bdf8; border: 1px solid #0891b2; padding: 8px; border-radius: 6px; margin-bottom: 15px; width: 100%; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -85,9 +86,18 @@
         </div>
     </div>
 
-    <!-- Playlist -->
+    <!-- Playlist Section -->
     <div class="section">
         <h3>🎵 Continuous Playlist & Live Track Controller</h3>
+        
+        <!-- 🔹 شروعاتي ٽريڪ چونڊڻ جو اختيار -->
+        <div class="form-group">
+            <label style="color: #38bdf8;">🎯 اسٽريم شروع ڪرڻ لاءِ پهريون ٽريڪ چونڊيو (Start Track):</label>
+            <select id="startTrackSelect" class="start-track-select" onchange="onStartTrackChange(this.value)">
+                <!-- Dropdown dynamic fill ٿيندو -->
+            </select>
+        </div>
+
         <div id="playlistContainer"></div>
         <button class="btn btn-add" onclick="addPlaylistItem()">+ Add Video URL</button>
     </div>
@@ -126,8 +136,18 @@
             container.innerHTML = '';
             const list = (data.playlist && data.playlist.length > 0) ? data.playlist : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
 
+            // 🔹 ڊراپ دائون (Dropdown) ۾ پلي لسٽ جون آپشنز ٺاهيو
+            const selectDropdown = document.getElementById('startTrackSelect');
+            selectDropdown.innerHTML = '';
+
             list.forEach((item, index) => {
                 addPlaylistItem(item.url, index === activeTrackIndexGlobal, index);
+
+                const option = document.createElement('option');
+                option.value = index;
+                option.text = `Track ${index + 1}: ${item.url.substring(item.url.lastIndexOf('/') + 1) || item.url}`;
+                if (index === activeTrackIndexGlobal) option.selected = true;
+                selectDropdown.appendChild(option);
             });
 
             document.getElementById('status').innerText = "Status: " + (data.is_live ? "🔴 LIVE BROADCASTING" : "⚪ STREAM OFF");
@@ -143,21 +163,39 @@
         const trackIdx = (index !== null) ? index : container.children.length;
 
         div.innerHTML = `
-            ${isActive ? '<span class="active-badge">▶ Playing Now</span>' : `<button class="btn-play" onclick="playSpecificTrack(${trackIdx})">▶ Play</button>`}
-            <input type="text" class="song-url" value="${url}" placeholder="https://domain.com/video.mp4">
-            <button class="btn-remove" onclick="this.parentElement.remove()">X</button>
+            ${isActive ? '<span class="active-badge">▶ Playing Now</span>' : `<button class="btn-play" onclick="playSpecificTrack(${trackIdx})">▶ Switch Now</button>`}
+            <input type="text" class="song-url" value="${url}" placeholder="https://domain.com/video.mp4" onchange="refreshDropdownList()">
+            <button class="btn-remove" onclick="this.parentElement.remove(); refreshDropdownList();">X</button>
         `;
         container.appendChild(div);
     }
 
-    // 🔹 مينوئل ٽريڪ مٽائڻ وارو فنڪشن
+    function refreshDropdownList() {
+        const urlInputs = document.querySelectorAll('.song-url');
+        const selectDropdown = document.getElementById('startTrackSelect');
+        selectDropdown.innerHTML = '';
+        
+        urlInputs.forEach((input, index) => {
+            const url = input.value.trim();
+            const option = document.createElement('option');
+            option.value = index;
+            option.text = `Track ${index + 1}: ${url.substring(url.lastIndexOf('/') + 1) || 'Empty URL'}`;
+            if (index === activeTrackIndexGlobal) option.selected = true;
+            selectDropdown.appendChild(option);
+        });
+    }
+
+    async function onStartTrackChange(selectedIndex) {
+        activeTrackIndexGlobal = parseInt(selectedIndex);
+    }
+
+    // 🔹 مينوئل يا لائيِو رن واري وقت ٽريڪ مٽائڻ
     async function playSpecificTrack(index) {
         const urlInputs = document.querySelectorAll('.song-url');
         const playlist = Array.from(urlInputs).map(input => ({ url: input.value.trim() })).filter(item => item.url !== '');
 
         if (index >= playlist.length) return;
 
-        // 🔹 ايندڙ ٽريڪ جو نالو ڳڻڻ
         const totalTracks = playlist.length;
         const upcomingIndex = (index + 1) % totalTracks;
         const autoNextTrackText = `Track ${upcomingIndex + 1} of ${totalTracks}`;
@@ -176,7 +214,7 @@
         }
     }
 
-    // 🔹 سيٽنگس سيوي ڪرڻ وارو فنڪشن
+    // 🔹 سيٽنگس سيوي ڪرڻ
     async function saveSettings() {
         const fbKey = document.getElementById('fbKey').value.trim();
         const ytKey = document.getElementById('ytKey').value.trim();
@@ -186,9 +224,14 @@
         const programName = document.getElementById('programName').value.trim();
         const nextTrack = document.getElementById('nextTrack').value.trim();
         const tickerText = document.getElementById('tickerText').value.trim();
+        const selectedStartTrack = parseInt(document.getElementById('startTrackSelect').value) || 0;
 
         const urlInputs = document.querySelectorAll('.song-url');
         const playlist = Array.from(urlInputs).map(input => ({ url: input.value.trim() })).filter(item => item.url !== '');
+
+        const totalTracks = playlist.length;
+        const upcomingIndex = (selectedStartTrack + 1) % totalTracks;
+        const defaultNextTrackName = nextTrack || `Track ${upcomingIndex + 1} of ${totalTracks}`;
 
         const { error } = await _supabase.from('stream_config').update({
             fb_key: fbKey,
@@ -197,9 +240,10 @@
             logo_size: logoSize,
             logo_position: logoPosition,
             program_name: programName,
-            next_track: nextTrack,
+            next_track: defaultNextTrackName,
             ticker_text: tickerText,
-            playlist: playlist
+            playlist: playlist,
+            current_track_index: selectedStartTrack
         }).eq('id', 1);
 
         if (error) {
@@ -210,17 +254,29 @@
         }
     }
 
+    // 🔹 اسٽريم اسٽارٽ يا اسٽاپ ڪرڻ
     async function toggleStream(status) {
         const fbKey = document.getElementById('fbKey').value.trim();
         const ytKey = document.getElementById('ytKey').value.trim();
-        
+        const selectedStartTrack = parseInt(document.getElementById('startTrackSelect').value) || 0;
+
         if (status && !fbKey && !ytKey) {
             alert("مھرباني ڪري گھٽ ۾ گھٽ ھڪ Stream Key داخل ڪريو!");
             return;
         }
 
+        const urlInputs = document.querySelectorAll('.song-url');
+        const playlist = Array.from(urlInputs).map(input => ({ url: input.value.trim() })).filter(item => item.url !== '');
+        
+        const totalTracks = playlist.length;
+        const upcomingIndex = (selectedStartTrack + 1) % totalTracks;
+        const autoNextTrackText = `Track ${upcomingIndex + 1} of ${totalTracks}`;
+
         const { error } = await _supabase.from('stream_config').update({ 
             is_live: status,
+            current_track_index: selectedStartTrack,
+            next_track: autoNextTrackText,
+            playlist: playlist,
             restart_trigger: Date.now() 
         }).eq('id', 1);
 
@@ -231,14 +287,16 @@
         }
     }
 
-    // 🔹 Realtime Subscription (سرور تان ٽريڪ مٽجڻ سان خودبخود next_track نظر ايندو)
+    // 🔹 Realtime Auto-Sync
     _supabase.channel('schema-db-changes')
         .on(
             'postgres_changes',
             { event: 'UPDATE', schema: 'public', table: 'stream_config', filter: 'id=eq.1' },
             (payload) => {
                 if (payload.new) {
-                    document.getElementById('nextTrack').value = payload.new.next_track || '';
+                    if (payload.new.next_track) {
+                        document.getElementById('nextTrack').value = payload.new.next_track;
+                    }
                     if (payload.new.current_track_index !== activeTrackIndexGlobal) {
                         activeTrackIndexGlobal = payload.new.current_track_index || 0;
                         loadSettings();
