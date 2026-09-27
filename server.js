@@ -14,8 +14,9 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 let currentConfig = null;
+let isTrackChanging = false;
 
-// 🔹 فونٽ فائيل جو نالو
+// 🔹 فونٽ فائل پاتھ
 const FONT_PATH = './sindhi.ttf';
 
 console.log("🚀 Live Studio Pro Engine Starting...");
@@ -32,7 +33,7 @@ async function checkDatabaseState() {
 
     currentConfig = config;
 
-    // جيئن ئي Trigger يا Settings تبديل ٿين
+    // جيئن ئي Trigger يا Settings يوزر پينل تان مٽجي
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
       console.log("🔄 Settings/Trigger Changed! Restarting Stream...");
@@ -46,12 +47,49 @@ async function checkDatabaseState() {
     if (!config.is_live && ffmpegProcess) {
       console.log("⏹️ Live Signal OFF. Stopping...");
       stopBroadcaster();
-    } else if (config.is_live && !ffmpegProcess) {
+    } else if (config.is_live && !ffmpegProcess && !isTrackChanging) {
       console.log("▶️ Live Signal ON. Launching Broadcaster...");
       startBroadcaster(config);
     }
   } catch (err) {
     console.error("Database Loop Error:", err);
+  }
+}
+
+// 🔹 آٽوميٽڪ نئون ٽريڪ سيٽ ڪرڻ ۽ اسٽوڊيو کي اپڊيٽ ڪرڻ جو فنڪشن
+async function handleNextTrackAuto() {
+  if (isTrackChanging) return;
+  isTrackChanging = true;
+
+  try {
+    if (!currentConfig || !currentConfig.playlist || currentConfig.playlist.length === 0) {
+      isTrackChanging = false;
+      return;
+    }
+
+    if (!currentConfig.is_live) {
+      isTrackChanging = false;
+      return;
+    }
+
+    const totalTracks = currentConfig.playlist.length;
+    let nextIndex = ((currentConfig.current_track_index || 0) + 1) % totalTracks;
+
+    console.log(`🎵 Track Ended! Automatically switching to Track Index: ${nextIndex} (Track ${nextIndex + 1} of ${totalTracks})`);
+
+    // Supabase ۾ هلندڙ ٽريڪ جا تفصيل اپڊيٽ ڪريو تاڪي اسٽوڊيو ۾ نظر اچي
+    await supabase.from('stream_config').update({
+      current_track_index: nextIndex
+    }).eq('id', 1);
+
+    currentConfig.current_track_index = nextIndex;
+
+    // فوراً نئون ٽريڪ اسٽريم ڪريو
+    startBroadcaster(currentConfig);
+  } catch (err) {
+    console.error("Auto Track Switch Error:", err);
+  } finally {
+    isTrackChanging = false;
   }
 }
 
@@ -103,7 +141,6 @@ function startBroadcaster(config) {
   }
 
   let ffmpegArgs = [
-    '-stream_loop', '-1', // 🔹 هي ڪوڊ FFmpeg کي ڪڏهن به بند ٿيڻ نه ڏيندو، وڊيو خودبخود لائيِو جاري رهندي
     '-re',
     '-reconnect', '1',
     '-reconnect_at_eof', '1',
@@ -134,9 +171,11 @@ function startBroadcaster(config) {
   try {
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
+    // 🔹 جڏهن وڊيو پوري ٿيندي ته هي بغير دير جي آٽوميٽڪ handleNextTrackAuto رن ڪندو
     ffmpegProcess.on('close', (code) => { 
       ffmpegProcess = null;
-      console.log(`[FFmpeg Closed]: Code ${code}`);
+      console.log(`[FFmpeg Finished Track]: Code ${code}`);
+      handleNextTrackAuto();
     });
   } catch (e) {
     console.error("Spawn Error:", e.message);
@@ -151,7 +190,7 @@ function stopBroadcaster() {
   }
 }
 
-setInterval(checkDatabaseState, 4000);
+setInterval(checkDatabaseState, 3000);
 
 app.get('/', (req, res) => res.send('Engine Active'));
 app.listen(PORT, () => console.log(`Server Active on Port ${PORT}`));
