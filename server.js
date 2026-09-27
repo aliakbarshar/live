@@ -2,6 +2,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { spawn } = require('child_process');
 const express = require('express');
 const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -14,12 +15,11 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 let currentConfig = null;
-let isTrackChanging = false;
+let isSwitching = false;
 
-// 🔹 فونٽ فائل پاتھ
 const FONT_PATH = './sindhi.ttf';
 
-console.log("🚀 Live Studio Pro Engine Starting...");
+console.log("🚀 Live Studio Pro Ultra Engine Starting...");
 
 async function checkDatabaseState() {
   try {
@@ -33,22 +33,18 @@ async function checkDatabaseState() {
 
     currentConfig = config;
 
-    // جيئن ئي Trigger يا Settings يوزر پينل تان مٽجي
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Settings/Trigger Changed! Restarting Stream...");
-      stopBroadcaster();
-      if (config.is_live) {
-        startBroadcaster(config);
-      }
+      console.log("🔄 Manual Switch / Config Changed!");
+      startBroadcaster(config);
       return;
     }
 
     if (!config.is_live && ffmpegProcess) {
       console.log("⏹️ Live Signal OFF. Stopping...");
       stopBroadcaster();
-    } else if (config.is_live && !ffmpegProcess && !isTrackChanging) {
-      console.log("▶️ Live Signal ON. Launching Broadcaster...");
+    } else if (config.is_live && !ffmpegProcess && !isSwitching) {
+      console.log("▶️ Live Signal ON. Starting Stream...");
       startBroadcaster(config);
     }
   } catch (err) {
@@ -56,40 +52,38 @@ async function checkDatabaseState() {
   }
 }
 
-// 🔹 آٽوميٽڪ نئون ٽريڪ سيٽ ڪرڻ ۽ اسٽوڊيو کي اپڊيٽ ڪرڻ جو فنڪشن
 async function handleNextTrackAuto() {
-  if (isTrackChanging) return;
-  isTrackChanging = true;
+  if (isSwitching) return;
+  isSwitching = true;
 
   try {
     if (!currentConfig || !currentConfig.playlist || currentConfig.playlist.length === 0) {
-      isTrackChanging = false;
+      isSwitching = false;
       return;
     }
 
     if (!currentConfig.is_live) {
-      isTrackChanging = false;
+      isSwitching = false;
       return;
     }
 
     const totalTracks = currentConfig.playlist.length;
     let nextIndex = ((currentConfig.current_track_index || 0) + 1) % totalTracks;
 
-    console.log(`🎵 Track Ended! Automatically switching to Track Index: ${nextIndex} (Track ${nextIndex + 1} of ${totalTracks})`);
+    console.log(`🎵 Track Ended! Switching to Index: ${nextIndex}`);
 
-    // Supabase ۾ هلندڙ ٽريڪ جا تفصيل اپڊيٽ ڪريو تاڪي اسٽوڊيو ۾ نظر اچي
     await supabase.from('stream_config').update({
       current_track_index: nextIndex
     }).eq('id', 1);
 
     currentConfig.current_track_index = nextIndex;
 
-    // فوراً نئون ٽريڪ اسٽريم ڪريو
+    // فوراً نئون ٽريڪ شروعات کان هلائڻ
     startBroadcaster(currentConfig);
   } catch (err) {
-    console.error("Auto Track Switch Error:", err);
+    console.error("Auto Switch Error:", err);
   } finally {
-    isTrackChanging = false;
+    isSwitching = false;
   }
 }
 
@@ -159,7 +153,7 @@ function startBroadcaster(config) {
     '-maxrate', '2500k',
     '-bufsize', '5000k',
     '-pix_fmt', 'yuv420p',
-    '-g', '60',
+    '-g', '30',
     '-c:a', 'aac',
     '-b:a', '128k',
     '-ar', '44100'
@@ -171,10 +165,10 @@ function startBroadcaster(config) {
   try {
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
-    // 🔹 جڏهن وڊيو پوري ٿيندي ته هي بغير دير جي آٽوميٽڪ handleNextTrackAuto رن ڪندو
-    ffmpegProcess.on('close', (code) => { 
+    ffmpegProcess.on('close', (code) => {
       ffmpegProcess = null;
-      console.log(`[FFmpeg Finished Track]: Code ${code}`);
+      console.log(`[FFmpeg Track Finished] Code: ${code}`);
+      // ٽريڪ ختم ٿيندي ئي خودبخود فوراً اڳيون ٽريڪ سيٽ ٿيندو
       handleNextTrackAuto();
     });
   } catch (e) {
@@ -190,7 +184,7 @@ function stopBroadcaster() {
   }
 }
 
-setInterval(checkDatabaseState, 3000);
+setInterval(checkDatabaseState, 2000);
 
 app.get('/', (req, res) => res.send('Engine Active'));
 app.listen(PORT, () => console.log(`Server Active on Port ${PORT}`));
