@@ -190,9 +190,10 @@
             restart_trigger: Date.now()
         }).eq('id', 1);
 
-        if (error) alert('Error: ' + error.message);
-        else {
-            alert('Studio Settings & Overlays Saved!');
+        if (error) {
+            alert('Error updating Supabase: ' + error.message);
+        } else {
+            alert('Studio Settings & Overlays Saved Successfully!');
             loadSettings();
         }
     }
