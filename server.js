@@ -33,6 +33,7 @@ async function checkDatabaseState() {
 
     currentConfig = config;
 
+    // مانوئل سوئچ يا بٽڻ دبائڻ جي صورت ۾
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
       console.log("🔄 Manual Switch / Config Changed!");
@@ -57,32 +58,40 @@ async function handleNextTrackAuto() {
   isSwitching = true;
 
   try {
-    if (!currentConfig || !currentConfig.playlist || currentConfig.playlist.length === 0) {
+    // ڊيٽابيس مان تازو ترين ڊيٽا حاصل ڪريو
+    const { data: config } = await supabase.from('stream_config').select('*').eq('id', 1).single();
+    if (!config || !config.is_live || !config.playlist || config.playlist.length === 0) {
       isSwitching = false;
       return;
     }
 
-    if (!currentConfig.is_live) {
-      isSwitching = false;
-      return;
-    }
+    const totalTracks = config.playlist.length;
+    let nextIndex = ((config.current_track_index || 0) + 1) % totalTracks;
+    
+    // ايندڙ وڊيو کان پوءِ واري وڊيو جو نالو (Next Track Info)
+    const upcomingIndex = (nextIndex + 1) % totalTracks;
+    const autoNextTrackText = `Track ${upcomingIndex + 1} of ${totalTracks}`;
 
-    const totalTracks = currentConfig.playlist.length;
-    let nextIndex = ((currentConfig.current_track_index || 0) + 1) % totalTracks;
+    console.log(`🎵 Video Ended! Auto-switching to Track Index: ${nextIndex}`);
 
-    console.log(`🎵 Track Ended! Switching to Index: ${nextIndex}`);
-
+    // Supabase کي اپڊيٽ ڪريو
     await supabase.from('stream_config').update({
-      current_track_index: nextIndex
+      current_track_index: nextIndex,
+      next_track: autoNextTrackText
     }).eq('id', 1);
 
-    currentConfig.current_track_index = nextIndex;
+    config.current_track_index = nextIndex;
+    config.next_track = autoNextTrackText;
+    currentConfig = config;
 
-    // فوراً نئون ٽريڪ شروعات کان هلائڻ
-    startBroadcaster(currentConfig);
+    // 1 سيڪنڊ جي وقفي کانپوءِ اڳيون ٽريڪ شروع ڪريو
+    setTimeout(() => {
+      startBroadcaster(config);
+      isSwitching = false;
+    }, 1000);
+
   } catch (err) {
     console.error("Auto Switch Error:", err);
-  } finally {
     isSwitching = false;
   }
 }
@@ -139,7 +148,7 @@ function startBroadcaster(config) {
     '-reconnect', '1',
     '-reconnect_at_eof', '1',
     '-reconnect_streamed', '1',
-    '-reconnect_delay_max', '2',
+    '-reconnect_delay_max', '5',
     '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     '-i', activeVideoUrl,
     '-i', logoUrl,
@@ -163,14 +172,23 @@ function startBroadcaster(config) {
   if (ytTarget) ffmpegArgs.push('-f', 'flv', ytTarget);
 
   try {
+    console.log(`▶️ Playing Track [Index: ${trackIndex}]: ${activeVideoUrl}`);
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
     ffmpegProcess.on('close', (code) => {
+      console.log(`[FFmpeg Track Finished] Exit Code: ${code}`);
       ffmpegProcess = null;
-      console.log(`[FFmpeg Track Finished] Code: ${code}`);
-      // ٽريڪ ختم ٿيندي ئي خودبخود فوراً اڳيون ٽريڪ سيٽ ٿيندو
-      handleNextTrackAuto();
+      
+      // جيڪڏهن يوزر اسٽريم بند نه ڪئي آهي ته خودبخود اگھيون ٽريڪ هلائيو
+      if (currentConfig && currentConfig.is_live) {
+        handleNextTrackAuto();
+      }
     });
+
+    ffmpegProcess.stderr.on('data', (data) => {
+      // ڊيبگنگ لاءِ FFmpeg لاگز (ضرورت پوي ته ڏسي سگهجي ٿو)
+    });
+
   } catch (e) {
     console.error("Spawn Error:", e.message);
   }
