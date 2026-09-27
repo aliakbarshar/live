@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stream Studio Pro Advanced Broadcaster</title>
+    <title>Stream Studio Pro Broadcaster</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; margin: 0; }
@@ -13,14 +13,11 @@
         .section h3 { color: #f59e0b; margin-top: 0; }
         .form-group { margin-bottom: 12px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
-        input[type="text"], input[type="number"], select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: #fff; box-sizing: border-box; }
+        input[type="text"], select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: #fff; box-sizing: border-box; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
         .btn { width: 100%; padding: 12px; margin-top: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.2s; }
         .btn-sync { background: #2563eb; color: white; }
-        .btn-sync:hover { background: #1d4ed8; }
         .btn-start { background: #16a34a; color: white; }
-        .btn-start:hover { background: #15803d; }
         .btn-stop { background: #dc2626; color: white; }
         .btn-add { background: #0891b2; color: white; padding: 8px; font-size: 14px; margin-top: 5px; }
         .btn-switch { background: #d97706; color: white; padding: 10px; font-size: 14px; }
@@ -33,52 +30,24 @@
 <body>
 
 <div class="container">
-    <h2>📡 Stream Studio Pro Advanced Broadcaster</h2>
+    <h2>📡 Stream Studio Pro Broadcaster</h2>
 
-    <!-- Section 1: Keys -->
+    <!-- Stream Keys -->
     <div class="section">
-        <h3>🔑 Stream Keys (فيس بوڪ ۽ يوٽيوب)</h3>
+        <h3>🔑 Stream Keys</h3>
         <div class="form-group">
             <label>Facebook Stream Key:</label>
             <input type="text" id="fbKey" placeholder="Paste Facebook Stream Key">
         </div>
         <div class="form-group">
-            <label>YouTube Stream Key:</label>
-            <input type="text" id="ytKey" placeholder="Paste YouTube Stream Key (Optional)">
+            <label>YouTube Stream Key (Optional):</label>
+            <input type="text" id="ytKey" placeholder="Paste YouTube Stream Key">
         </div>
     </div>
 
-    <!-- Section 2: Logo & Overlay Text -->
+    <!-- Track Switcher -->
     <div class="section">
-        <h3>🎨 Overlay & Logo Settings</h3>
-        <div class="grid-3">
-            <div class="form-group">
-                <label>Logo Image Direct URL:</label>
-                <input type="text" id="logoUrl" placeholder="https://domain.com/logo.png">
-            </div>
-            <div class="form-group">
-                <label>Logo Size (Width in Pixels):</label>
-                <input type="number" id="logoWidth" value="120" placeholder="e.g. 100">
-            </div>
-            <div class="form-group">
-                <label>Logo Position:</label>
-                <select id="logoPos">
-                    <option value="top-left">Top Left (ساڄي مٿي)</option>
-                    <option value="top-right" selected>Top Right (کاٻي مٿي)</option>
-                    <option value="bottom-left">Bottom Left (ساڄي هيٺ)</option>
-                    <option value="bottom-right">Bottom Right (کاٻي هيٺ)</option>
-                </select>
-            </div>
-        </div>
-        <div class="form-group">
-            <label>Scrolling Ticker Text (هيٺيان آهستي آهستي هلندڙ ٽيڪسٽ):</label>
-            <input type="text" id="tickerText" placeholder="Enter continuous news/headline text here...">
-        </div>
-    </div>
-
-    <!-- Section 3: Direct Live Track Switcher -->
-    <div class="section">
-        <h3>⚡ Direct Track Switcher (هينئر ئي ٽريڪ مٽايو)</h3>
+        <h3>⚡ Direct Track Switcher</h3>
         <div class="grid-2">
             <div class="form-group">
                 <label>Select Track to Play Now:</label>
@@ -90,19 +59,19 @@
         </div>
     </div>
 
-    <!-- Section 4: Playlist (Songs/Videos) -->
+    <!-- Playlist -->
     <div class="section">
-        <h3>🎵 Playlist / Song List (گانن جي لسٽ)</h3>
+        <h3>🎵 Playlist / Video List</h3>
         <div id="playlistContainer"></div>
-        <button class="btn btn-add" onclick="addPlaylistItem()">+ Add New Song/Video URL</button>
+        <button class="btn btn-add" onclick="addPlaylistItem()">+ Add Video URL</button>
     </div>
 
-    <!-- Actions -->
-    <button class="btn btn-sync" onclick="saveSettings()">💾 Save & Sync All Settings</button>
-    <button class="btn btn-start" onclick="toggleStream(true)">▶️ Start Multi-Stream (FB + YT)</button>
-    <button class="btn btn-stop" onclick="toggleStream(false)">⏹️ Stop All Streams</button>
+    <!-- Controls -->
+    <button class="btn btn-sync" onclick="saveSettings()">💾 Save Settings</button>
+    <button class="btn btn-start" onclick="toggleStream(true)">▶️ Start Live Stream</button>
+    <button class="btn btn-stop" onclick="toggleStream(false)">⏹️ Stop Stream</button>
 
-    <div id="status">Status: Checking Connection...</div>
+    <div id="status">Status: Connecting...</div>
 </div>
 
 <script>
@@ -110,20 +79,12 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    let currentTrackIndex = 0;
-
     async function loadSettings() {
         const { data, error } = await _supabase.from('stream_config').select('*').eq('id', 1).single();
         if (data) {
             document.getElementById('fbKey').value = data.fb_key || '';
             document.getElementById('ytKey').value = data.yt_key || '';
-            document.getElementById('logoUrl').value = data.logo_url || '';
-            document.getElementById('logoWidth').value = data.logo_width || 120;
-            document.getElementById('logoPos').value = data.logo_pos || 'top-right';
-            document.getElementById('tickerText').value = data.ticker_text || '';
             
-            currentTrackIndex = data.current_track_index || 0;
-
             const container = document.getElementById('playlistContainer');
             container.innerHTML = '';
             const list = (data.playlist && data.playlist.length > 0) ? data.playlist : [{ url: 'https://aliakbarshar.github.io/live/TestTrack1.mp4' }];
@@ -136,11 +97,11 @@
                 const opt = document.createElement('option');
                 opt.value = index;
                 opt.text = `Track ${index + 1}: ${item.url.substring(item.url.lastIndexOf('/') + 1)}`;
-                if(currentTrackIndex === index) opt.selected = true;
+                if((data.current_track_index || 0) === index) opt.selected = true;
                 selectDropdown.appendChild(opt);
             });
 
-            document.getElementById('status').innerText = "Status: " + (data.is_live ? "🔴 MULTI-STREAM LIVE" : "⚪ STREAM OFF");
+            document.getElementById('status').innerText = "Status: " + (data.is_live ? "🔴 LIVE BROADCASTING" : "⚪ STREAM OFF");
             document.getElementById('status').style.background = data.is_live ? "#15803d" : "#334155";
         }
     }
@@ -159,28 +120,18 @@
     async function saveSettings() {
         const fbKey = document.getElementById('fbKey').value.trim();
         const ytKey = document.getElementById('ytKey').value.trim();
-        const logoUrl = document.getElementById('logoUrl').value.trim();
-        const logoWidth = parseInt(document.getElementById('logoWidth').value) || 120;
-        const logoPos = document.getElementById('logoPos').value;
-        const tickerText = document.getElementById('tickerText').value.trim();
-
         const urlInputs = document.querySelectorAll('.song-url');
         const playlist = Array.from(urlInputs).map(input => ({ url: input.value.trim() })).filter(item => item.url !== '');
 
         const { error } = await _supabase.from('stream_config').update({
             fb_key: fbKey,
             yt_key: ytKey,
-            logo_url: logoUrl,
-            logo_width: logoWidth,
-            logo_pos: logoPos,
-            ticker_text: tickerText,
             playlist: playlist
         }).eq('id', 1);
 
-        if (error) {
-            alert('Error saving settings: ' + error.message);
-        } else {
-            alert('All Settings Saved & Synced!');
+        if (error) alert('Error: ' + error.message);
+        else {
+            alert('Settings Saved!');
             loadSettings();
         }
     }
@@ -192,22 +143,20 @@
             restart_trigger: Date.now() 
         }).eq('id', 1);
 
-        if (error) {
-            alert('Error switching track: ' + error.message);
-        } else {
-            alert('Track Switching Signal Sent to Server!');
+        if (error) alert('Error: ' + error.message);
+        else {
+            alert('Track Switch Signal Sent!');
             loadSettings();
         }
     }
 
     async function toggleStream(status) {
-        if(status) {
-            const fbKey = document.getElementById('fbKey').value.trim();
-            const ytKey = document.getElementById('ytKey').value.trim();
-            if(!fbKey && !ytKey) {
-                alert("پهرين گھٽ ۾ گھٽ فيس بوڪ يا يوٽيوب جي Stream Key لڳايو!");
-                return;
-            }
+        const fbKey = document.getElementById('fbKey').value.trim();
+        const ytKey = document.getElementById('ytKey').value.trim();
+        
+        if (status && !fbKey && !ytKey) {
+            alert("مھرباني ڪري گھٽ ۾ گھٽ ھڪ Stream Key داخل ڪريو!");
+            return;
         }
 
         const { error } = await _supabase.from('stream_config').update({ 
@@ -215,9 +164,8 @@
             restart_trigger: Date.now() 
         }).eq('id', 1);
 
-        if (error) {
-            alert('Status Error: ' + error.message);
-        } else {
+        if (error) alert('Error: ' + error.message);
+        else {
             alert(status ? "اسٽريم چالو ڪئي پئي وڃي..." : "اسٽريم بند ڪئي پئي وڃي...");
             loadSettings();
         }
