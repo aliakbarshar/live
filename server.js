@@ -16,7 +16,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 
-console.log("🚀 Stream Engine Starting...");
+console.log("🚀 Stream Studio Pro Multi-Broadcaster Engine Starting...");
 
 async function checkDatabaseState() {
   try {
@@ -28,10 +28,10 @@ async function checkDatabaseState() {
 
     if (error || !config) return;
 
-    // Track Change Trigger
+    // Track Switch Trigger
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Changing track now...");
+      console.log("🔄 Changing active track now...");
       stopBroadcaster();
       if (config.is_live) {
         startBroadcaster(config);
@@ -40,10 +40,10 @@ async function checkDatabaseState() {
     }
 
     if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Stopping Stream...");
+      console.log("⏹️ Stopping Broadcaster...");
       stopBroadcaster();
     } else if (config.is_live && !ffmpegProcess) {
-      console.log("▶️ Launching Live Stream...");
+      console.log("▶️ Launching Multi-Broadcaster...");
       startBroadcaster(config);
     }
   } catch (err) {
@@ -89,7 +89,7 @@ function startBroadcaster(config) {
 
   const outputs = [];
 
-  // FB Key processing - Auto detect if user pasted full URL or just key
+  // Facebook Stream URL Processing
   if (config.fb_key && config.fb_key.trim() !== '') {
     const rawFbKey = config.fb_key.trim();
     if (rawFbKey.startsWith('rtmp://') || rawFbKey.startsWith('rtmps://')) {
@@ -99,7 +99,7 @@ function startBroadcaster(config) {
     }
   }
 
-  // YT Key processing
+  // YouTube Stream URL Processing
   if (config.yt_key && config.yt_key.trim() !== '') {
     const rawYtKey = config.yt_key.trim();
     if (rawYtKey.startsWith('rtmp://') || rawYtKey.startsWith('rtmps://')) {
@@ -110,11 +110,12 @@ function startBroadcaster(config) {
   }
 
   if (outputs.length === 0) {
-    console.error("❌ No valid Stream Keys found!");
+    console.error("❌ No Stream Keys provided!");
     return;
   }
 
-  console.log(`🎬 Stream Active. Destinations Count: ${outputs.length}`);
+  console.log(`🎬 Loaded Track Index: ${trackIndex}`);
+  console.log(`📡 Destinations Count: ${outputs.length}`);
 
   let filterComplex = `[1:v]scale=${logoWidth}:-1[logo];[0:v][logo]${overlayPosFilter}[vlogo]`;
   let finalVideoMap = '[vlogo]';
@@ -146,6 +147,7 @@ function startBroadcaster(config) {
     '-ar', '44100'
   ];
 
+  // Multiple Stream Outputs Handling
   if (outputs.length === 1) {
     ffmpegArgs.push('-f', 'flv', outputs[0]);
   } else {
@@ -178,4 +180,4 @@ function stopBroadcaster() {
 setInterval(checkDatabaseState, 5000);
 
 app.get('/', (req, res) => res.send('Stream Engine Running...'));
-app.listen(PORT, () => console.log(`🌐 App listening on port ${PORT}`));
+app.listen(PORT, () => console.log(`🌐 Server running on port ${PORT}`));
