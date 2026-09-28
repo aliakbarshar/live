@@ -1,5 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -13,13 +13,14 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6Ik
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY || '');
 
 let ffmpegProcess = null;
+let autoSwitchTimer = null; // ۵ سيڪنڊن اڳ وارو ٽائيمر
 let lastRestartTrigger = null;
 let currentConfig = null;
 let isBusySwitching = false;
 
 const FONT_PATH = path.join(__dirname, 'sindhi.ttf');
 
-console.log("🚀 Live Studio Pro Engine Starting Realtime Loop...");
+console.log("🚀 Live Studio Engine Started with 5-Second Early Auto-Switch Logic...");
 
 function sanitizeText(text) {
   if (!text) return '';
@@ -29,7 +30,21 @@ function sanitizeText(text) {
     .replace(/:/g, '\\:');
 }
 
-// Supabase جنهن سيڪنڊ وڊيو ختم ٿيندي ترت نئين وڊيو ڏانهن شفٽ ڪندو
+// وڊيو جي ڪل ڊگهائي (Duration) سيڪنڊن ۾ حاصل ڪرڻ
+function getVideoDuration(url) {
+  return new Promise((resolve) => {
+    exec(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${url}"`, (error, stdout) => {
+      if (error || !stdout) {
+        resolve(null);
+      } else {
+        const duration = parseFloat(stdout.trim());
+        resolve(isNaN(duration) ? null : duration);
+      }
+    });
+  });
+}
+
+// ٽريڪ تبديل ڪرڻ وارو آٽو مينجرمينٽ
 async function handleNextTrackAuto() {
   if (isBusySwitching) return;
   isBusySwitching = true;
@@ -45,7 +60,7 @@ async function handleNextTrackAuto() {
     const total = playlist.length;
     let currentIdx = Number(config.current_track_index || 0);
     
-    // اڳئين ٽريڪ ڏانهن واڌارو (Auto Move Next)
+    // ايندڙ ٽريڪ جي چونڊ
     let nextIdx = (currentIdx + 1) % total;
     let upcomingIdx = (nextIdx + 1) % total;
 
@@ -53,9 +68,9 @@ async function handleNextTrackAuto() {
     const newTrigger = Date.now();
     lastRestartTrigger = newTrigger;
 
-    console.log(`🎵 Auto-Transitioning: Index ${currentIdx} ➔ Index ${nextIdx}`);
+    console.log(`⏱️ [5-Sec Early Switch Triggered]: Index ${currentIdx} ➔ Index ${nextIdx}`);
 
-    // DB ۾ لائيِو اپڊيٽ
+    // DB ۾ اپڊيٽ
     await supabase.from('stream_config').update({
       current_track_index: nextIdx,
       next_track: autoNextText,
@@ -67,12 +82,12 @@ async function handleNextTrackAuto() {
     config.restart_trigger = newTrigger;
     currentConfig = config;
 
-    // FFmpeg چالو ڪريو
+    // نئون ٽريڪ چالو ڪريو
     startBroadcaster(config);
   } catch (err) {
     console.error("Auto Switch Error:", err);
   } finally {
-    setTimeout(() => { isBusySwitching = false; }, 2000);
+    setTimeout(() => { isBusySwitching = false; }, 3000);
   }
 }
 
@@ -85,9 +100,9 @@ async function checkDatabaseState() {
 
     currentConfig = config;
 
-    // مينوئل چينج چيڪ
+    // مينوئل يا ٻاهران مٽجڻ وارو سگنل
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
-      console.log("🔄 Manual Track/Config Switch Triggered!");
+      console.log("🔄 Manual Switch Requested!");
       lastRestartTrigger = config.restart_trigger;
       startBroadcaster(config);
       return;
@@ -106,7 +121,7 @@ async function checkDatabaseState() {
   }
 }
 
-function startBroadcaster(config) {
+async function startBroadcaster(config) {
   stopBroadcaster();
 
   const playlist = (config.playlist && config.playlist.length > 0) 
@@ -153,7 +168,6 @@ function startBroadcaster(config) {
     videoFilter += `;[v1]null[outv]`;
   }
 
-  // اسٽريم فليگز کي RTMP ڪٽجڻ کان بچائڻ لاءِ فاست مڪمل رکيو ويو آهي
   let ffmpegArgs = [
     '-re',
     '-reconnect', '1',
@@ -189,21 +203,29 @@ function startBroadcaster(config) {
   }
 
   try {
-    console.log(`▶ Stream Active Track Index [${trackIndex}]: ${activeVideoUrl}`);
+    console.log(`▶ Starting Track [Index ${trackIndex}]: ${activeVideoUrl}`);
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
-    ffmpegProcess.on('close', (code) => {
-      console.log(`[FFmpeg Finished Track] Exit Code: ${code}`);
-      ffmpegProcess = null;
+    // ۵ سيڪنڊ پهرين آٽو تبديلي جو ٽائيمر سيٽ ڪريو
+    const duration = await getVideoDuration(activeVideoUrl);
+    if (duration && duration > 10) {
+      const switchDelay = (duration - 5) * 1000; // ۵ سيڪنڊ اڳي
+      console.log(`⏱️ Track Duration: ${duration.toFixed(1)}s. Auto switch set for ${Math.round(switchDelay / 1000)}s.`);
       
-      // جڏهن گانو ختم ٿئي، بلا تاخير ترت handleNextTrackAuto هلائي!
+      autoSwitchTimer = setTimeout(() => {
+        handleNextTrackAuto();
+      }, switchDelay);
+    }
+
+    ffmpegProcess.on('close', (code) => {
+      console.log(`[FFmpeg Closed] Code: ${code}`);
+      ffmpegProcess = null;
+      if (autoSwitchTimer) clearTimeout(autoSwitchTimer);
+      
+      // ان حالت لاءِ جڏهن ٽائيمر سيٽ نه ٿي سگهيو هجي
       if (currentConfig && currentConfig.is_live && !isBusySwitching) {
         handleNextTrackAuto();
       }
-    });
-
-    ffmpegProcess.stderr.on('data', (data) => {
-      // debug logs
     });
 
   } catch (e) {
@@ -212,6 +234,10 @@ function startBroadcaster(config) {
 }
 
 function stopBroadcaster() {
+  if (autoSwitchTimer) {
+    clearTimeout(autoSwitchTimer);
+    autoSwitchTimer = null;
+  }
   if (ffmpegProcess) {
     ffmpegProcess.removeAllListeners('close');
     ffmpegProcess.kill('SIGKILL');
