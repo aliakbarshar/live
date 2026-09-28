@@ -3,6 +3,7 @@ const { spawn, exec } = require('child_process');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -20,7 +21,7 @@ let isBusySwitching = false;
 
 const FONT_PATH = path.join(__dirname, 'sindhi.ttf');
 
-console.log("🚀 Live Studio Engine Started with 5-Second Early Auto-Switch Logic & Safe Crash Fix...");
+console.log("🚀 Live Studio Engine Started with Fast Reconnect, Optimized Bitrate & Anti-Freeze Logic...");
 
 function sanitizeText(text) {
   if (!text) return '';
@@ -168,12 +169,12 @@ async function startBroadcaster(config) {
     videoFilter += `;[v1]null[outv]`;
   }
 
+  // اپٽمائيز ٿيل ۽ فاسٽ FFmpeg آرمينٽس
   let ffmpegArgs = [
     '-re',
     '-reconnect', '1',
-    '-reconnect_at_eof', '1',
     '-reconnect_streamed', '1',
-    '-reconnect_delay_max', '10',
+    '-reconnect_delay_max', '5',
     '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     '-i', activeVideoUrl,
     '-i', logoUrl,
@@ -183,11 +184,11 @@ async function startBroadcaster(config) {
     '-c:v', 'libx264',
     '-preset', 'ultrafast',
     '-tune', 'zerolatency',
-    '-b:v', '2500k',
-    '-maxrate', '2500k',
-    '-bufsize', '5000k',
+    '-b:v', '1800k',       // Bitrate 1800k ڪئي وئي تاڪه CPU ۽ RAM هلڪي رهي
+    '-maxrate', '2000k',
+    '-bufsize', '4000k',
     '-pix_fmt', 'yuv420p',
-    '-g', '30',
+    '-g', '60',            // Facebook/YouTube لاءِ 2-Second Keyframe Interval
     '-c:a', 'aac',
     '-b:a', '128k',
     '-ar', '44100',
@@ -256,6 +257,13 @@ function stopBroadcaster() {
 }
 
 setInterval(checkDatabaseState, 1500);
+
+// Render کي سلپ (Sleep/Inactivity Spin-down) ٿيڻ کان بچائڻ لاءِ Auto Self-Ping
+setInterval(() => {
+  http.get(`http://localhost:${PORT}`, (res) => {
+    // Keep Server Alive
+  }).on('error', () => {});
+}, 3 * 60 * 1000); // ھر 3 منٽن بعد پنگ ڪندو
 
 app.get('/', (req, res) => res.send('Engine Active'));
 app.listen(PORT, () => console.log(`Server Listening on Port ${PORT}`));
