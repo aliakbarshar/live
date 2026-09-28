@@ -7,10 +7,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; margin: 0; }
-        .container { max-width: 850px; margin: 0 auto; background: #1e293b; padding: 25px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); }
+        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 25px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); }
         h2 { text-align: center; color: #38bdf8; margin-bottom: 20px; }
         .section { background: #0f172a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #334155; }
-        .section h3 { color: #f59e0b; margin-top: 0; }
+        .section h3 { color: #f59e0b; margin-top: 0; display: flex; align-items: center; justify-content: space-between; }
         .form-group { margin-bottom: 12px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
         input[type="text"], select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: #fff; box-sizing: border-box; }
@@ -29,12 +29,69 @@
         .playlist-item button.btn-remove { background: #e11d48; color: white; border: none; border-radius: 6px; padding: 10px 12px; cursor: pointer; }
         .active-badge { background: #10b981; color: #000; padding: 6px 10px; font-weight: bold; border-radius: 4px; font-size: 12px; white-space: nowrap; }
         .start-track-select { background: #0f172a; color: #38bdf8; border: 1px solid #0891b2; padding: 8px; border-radius: 6px; margin-bottom: 15px; width: 100%; font-weight: bold; }
+
+        /* 🎬 MINI STUDIO PLAYER STYLES */
+        .player-wrapper { position: relative; width: 100%; max-width: 560px; height: 315px; margin: 0 auto 15px auto; background: #000; border-radius: 8px; overflow: hidden; border: 2px solid #38bdf8; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .player-wrapper video { width: 100%; height: 100%; object-fit: contain; }
+        
+        /* Overlays on Preview Player */
+        .preview-logo { position: absolute; max-width: 70px; z-index: 10; pointer-events: none; }
+        .preview-logo.top-right { top: 10px; right: 10px; }
+        .preview-logo.top-left { top: 10px; left: 10px; }
+        .preview-logo.bottom-right { bottom: 45px; right: 10px; }
+        .preview-logo.bottom-left { bottom: 45px; left: 10px; }
+
+        .preview-titles { position: absolute; top: 10px; left: 10px; z-index: 9; pointer-events: none; }
+        .preview-program { background: rgba(0,0,0,0.7); color: #fff; padding: 3px 8px; font-size: 12px; font-weight: bold; border-radius: 3px; margin-bottom: 3px; display: inline-block; }
+        .preview-next-track { background: rgba(0,0,0,0.5); color: #facc15; padding: 2px 6px; font-size: 10px; font-weight: bold; border-radius: 3px; }
+
+        .preview-ticker { position: absolute; bottom: 35px; left: 0; width: 100%; background: rgba(220, 38, 38, 0.85); color: #fff; font-size: 12px; font-weight: bold; white-space: nowrap; overflow: hidden; padding: 3px 0; z-index: 10; pointer-events: none; }
+        .preview-ticker span { display: inline-block; padding-left: 100%; animation: tickerAnim 12s linear infinite; }
+
+        @keyframes tickerAnim {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-100%, 0); }
+        }
+
+        .player-controls { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+        .btn-ctrl { background: #334155; color: white; border: 1px solid #475569; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; }
+        .btn-ctrl:hover { background: #475569; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h2>📡 Stream Studio Pro Broadcaster</h2>
+
+    <!-- 📺 MINI STUDIO PREVIEW PLAYER SECTION -->
+    <div class="section">
+        <h3>📺 Live Studio Mini Preview Player <span id="playerTrackInfo" style="font-size: 12px; color: #38bdf8;">Track 1</span></h3>
+        
+        <div class="player-wrapper">
+            <!-- Dynamic Graphics Overlay -->
+            <img id="prevLogo" class="preview-logo top-right" src="" style="display: none;">
+            <div class="preview-titles">
+                <div id="prevProgram" class="preview-program" style="display: none;"></div>
+                <div id="prevNextTrack" class="preview-next-track" style="display: none;"></div>
+            </div>
+            <div id="prevTickerBox" class="preview-ticker" style="display: none;">
+                <span id="prevTickerText"></span>
+            </div>
+
+            <!-- Mini HTML5 Video Player -->
+            <video id="studioVideo" controls preload="metadata">
+                توهان جو برائوزر وڊيو پليئر کي سپورٽ نٿو ڪري.
+            </video>
+        </div>
+
+        <!-- Player Custom Studio Controls -->
+        <div class="player-controls">
+            <button class="btn-ctrl" onclick="rewindVideo(10)">⏪ -10s</button>
+            <button class="btn-ctrl" onclick="togglePlayPause()">⏯️ Play/Pause</button>
+            <button class="btn-ctrl" onclick="fastForwardVideo(10)">⏩ +10s</button>
+            <button class="btn-ctrl" style="background: #0891b2;" onclick="skipToNextTrack()">⏭️ Next Video</button>
+        </div>
+    </div>
 
     <!-- Stream Keys -->
     <div class="section">
@@ -55,15 +112,15 @@
         <div class="grid-3">
             <div class="form-group">
                 <label>لوگو تصوير جي ڊائريڪٽ لنڪ (PNG/JPG URL):</label>
-                <input type="text" id="logoUrl" placeholder="https://domain.com/logo.png">
+                <input type="text" id="logoUrl" placeholder="https://domain.com/logo.png" oninput="updateLiveGraphicsPreview()">
             </div>
             <div class="form-group">
                 <label>لوگو سائيز (Width in px):</label>
-                <input type="text" id="logoSize" placeholder="120">
+                <input type="text" id="logoSize" placeholder="120" oninput="updateLiveGraphicsPreview()">
             </div>
             <div class="form-group">
                 <label>لوگو پوزيشن:</label>
-                <select id="logoPosition">
+                <select id="logoPosition" onchange="updateLiveGraphicsPreview()">
                     <option value="top-right">Top Right (ساڄي مٿان)</option>
                     <option value="top-left">Top Left (کاٻي مٿان)</option>
                     <option value="bottom-right">Bottom Right (ساڄي هيٺ)</option>
@@ -74,16 +131,16 @@
         <div class="grid-2">
             <div class="form-group">
                 <label>پروگرام / شو جو نالو (Program Title):</label>
-                <input type="text" id="programName" placeholder="مثال: لائيِو سنڌي پروگرام">
+                <input type="text" id="programName" placeholder="مثال: لائيِو سنڌي پروگرام" oninput="updateLiveGraphicsPreview()">
             </div>
             <div class="form-group">
                 <label>ايندڙ وڊيو/سونگ جو نالو (Next Track Title):</label>
-                <input type="text" id="nextTrack" placeholder="مثال: ايندڙ گانو: سنڌي ڪلام">
+                <input type="text" id="nextTrack" placeholder="مثال: ايندڙ گانو: سنڌي ڪلام" oninput="updateLiveGraphicsPreview()">
             </div>
         </div>
         <div class="form-group">
             <label>هيٺيان هلندڙ بريڪنگ نيوز پٽي (Ticker Text):</label>
-            <input type="text" id="tickerText" placeholder="هتي پنهنجي هلندڙ پٽي يا بريڪنگ نيوز لکو...">
+            <input type="text" id="tickerText" placeholder="هتي پنهنجي هلندڙ پٽي يا بريڪنگ نيوز لکو..." oninput="updateLiveGraphicsPreview()">
         </div>
     </div>
 
@@ -117,6 +174,7 @@
 
     let activeTrackIndexGlobal = 0;
     let currentPlaylistData = [];
+    const videoPlayer = document.getElementById('studioVideo');
 
     async function loadSettings() {
         const { data, error } = await _supabase.from('stream_config').select('*').eq('id', 1).single();
@@ -131,15 +189,78 @@
             document.getElementById('nextTrack').value = data.next_track || '';
             document.getElementById('tickerText').value = data.ticker_text || '';
 
-            activeTrackIndexGlobal = data.current_track_index || 0;
+            activeTrackIndexGlobal = Number(data.current_track_index || 0);
             currentPlaylistData = (data.playlist && data.playlist.length > 0) ? data.playlist : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
 
             renderPlaylistItems(currentPlaylistData);
             refreshDropdownList();
+            updateLiveGraphicsPreview();
+            loadVideoInStudioPlayer(activeTrackIndexGlobal);
 
             document.getElementById('status').innerText = "Status: " + (data.is_live ? "🔴 LIVE BROADCASTING" : "⚪ STREAM OFF");
             document.getElementById('status').style.background = data.is_live ? "#15803d" : "#334155";
         }
+    }
+
+    // 📺 PLAYER CONTROL FUNCTIONS
+    function loadVideoInStudioPlayer(index) {
+        if (currentPlaylistData[index] && currentPlaylistData[index].url) {
+            const videoUrl = currentPlaylistData[index].url;
+            if (videoPlayer.src !== videoUrl) {
+                videoPlayer.src = videoUrl;
+                videoPlayer.load();
+            }
+            document.getElementById('playerTrackInfo').innerText = `Playing Track ${index + 1} of ${currentPlaylistData.length}`;
+        }
+    }
+
+    function togglePlayPause() {
+        if (videoPlayer.paused) videoPlayer.play();
+        else videoPlayer.pause();
+    }
+
+    function rewindVideo(seconds) {
+        videoPlayer.currentTime = Math.max(0, videoPlayer.currentTime - seconds);
+    }
+
+    function fastForwardVideo(seconds) {
+        videoPlayer.currentTime = Math.min(videoPlayer.duration, videoPlayer.currentTime + seconds);
+    }
+
+    // 🎨 OVERLAYS PREVIEW REALTIME UPDATER
+    function updateLiveGraphicsPreview() {
+        const logoUrl = document.getElementById('logoUrl').value.trim();
+        const logoSize = document.getElementById('logoSize').value.trim() || '120';
+        const logoPos = document.getElementById('logoPosition').value;
+        const program = document.getElementById('programName').value.trim();
+        const nextTrk = document.getElementById('nextTrack').value.trim();
+        const ticker = document.getElementById('tickerText').value.trim();
+
+        // Update Logo Preview
+        const img = document.getElementById('prevLogo');
+        if (logoUrl) {
+            img.src = logoUrl;
+            img.className = `preview-logo ${logoPos}`;
+            img.style.width = Math.min(parseInt(logoSize) || 70, 90) + 'px';
+            img.style.display = 'block';
+        } else img.style.display = 'none';
+
+        // Update Program & Next Track Title
+        const pProg = document.getElementById('prevProgram');
+        if (program) { pProg.innerText = program; pProg.style.display = 'inline-block'; } 
+        else pProg.style.display = 'none';
+
+        const pNext = document.getElementById('prevNextTrack');
+        if (nextTrk) { pNext.innerText = nextTrk; pNext.style.display = 'block'; } 
+        else pNext.style.display = 'none';
+
+        // Update Ticker
+        const pTickerBox = document.getElementById('prevTickerBox');
+        const pTickerText = document.getElementById('prevTickerText');
+        if (ticker) {
+            pTickerText.innerText = ticker;
+            pTickerBox.style.display = 'block';
+        } else pTickerBox.style.display = 'none';
     }
 
     function renderPlaylistItems(list) {
@@ -191,8 +312,10 @@
         const selectDropdown = document.getElementById('startTrackSelect');
         selectDropdown.innerHTML = '';
         
+        currentPlaylistData = [];
         urlInputs.forEach((input, index) => {
             const url = input.value.trim();
+            if (url) currentPlaylistData.push({ url });
             const option = document.createElement('option');
             option.value = index;
             option.text = `Track ${index + 1}: ${url.substring(url.lastIndexOf('/') + 1) || 'Empty Track'}`;
@@ -230,6 +353,7 @@
             activeTrackIndexGlobal = index;
             reindexPlaylistUI();
             refreshDropdownList();
+            loadVideoInStudioPlayer(index);
         }
     }
 
@@ -277,6 +401,7 @@
             alert('Error updating Supabase: ' + error.message);
         } else {
             alert('Studio Settings Saved!');
+            updateLiveGraphicsPreview();
         }
     }
 
@@ -312,7 +437,7 @@
         }
     }
 
-    // Realtime Sync Engine for Auto-play & Active Track Updates
+    // Realtime Sync Engine for Auto-play, Player & Active Track Updates
     _supabase.channel('schema-db-changes')
         .on(
             'postgres_changes',
@@ -322,13 +447,15 @@
                     if (payload.new.next_track) {
                         document.getElementById('nextTrack').value = payload.new.next_track;
                     }
-                    if (payload.new.current_track_index !== undefined && payload.new.current_track_index !== activeTrackIndexGlobal) {
-                        activeTrackIndexGlobal = payload.new.current_track_index;
+                    if (payload.new.current_track_index !== undefined && Number(payload.new.current_track_index) !== activeTrackIndexGlobal) {
+                        activeTrackIndexGlobal = Number(payload.new.current_track_index);
                         reindexPlaylistUI();
                         refreshDropdownList();
+                        loadVideoInStudioPlayer(activeTrackIndexGlobal);
                     }
                     document.getElementById('status').innerText = "Status: " + (payload.new.is_live ? "🔴 LIVE BROADCASTING" : "⚪ STREAM OFF");
                     document.getElementById('status').style.background = payload.new.is_live ? "#15803d" : "#334155";
+                    updateLiveGraphicsPreview();
                 }
             }
         )
