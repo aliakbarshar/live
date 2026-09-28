@@ -20,6 +20,7 @@
         .btn-sync { background: #2563eb; color: white; }
         .btn-start { background: #16a34a; color: white; }
         .btn-stop { background: #dc2626; color: white; }
+        .btn-next { background: #d97706; color: white; margin-top: 8px; }
         .btn-add { background: #0891b2; color: white; padding: 8px; font-size: 14px; margin-top: 5px; }
         #status { margin-top: 15px; text-align: center; font-weight: bold; padding: 12px; border-radius: 6px; font-size: 18px; }
         .playlist-item { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; background: #1e293b; padding: 8px; border-radius: 6px; border: 1px solid #334155; }
@@ -91,13 +92,14 @@
         <h3>🎵 Continuous Playlist & Live Track Controller</h3>
         
         <div class="form-group">
-            <label style="color: #38bdf8;">🎯 اسٽريم شروع ڪرڻ لاءِ پهريون ٽريڪ چونڊيو (Start Track):</label>
+            <label style="color: #38bdf8;">🎯 اسٽريم ۾ هلندڙ/چونڊيل ٽريڪ (Active Track Index):</label>
             <select id="startTrackSelect" class="start-track-select" onchange="onStartTrackChange(this.value)">
             </select>
         </div>
 
         <div id="playlistContainer"></div>
         <button class="btn btn-add" onclick="addPlaylistItem()">+ Add Video URL</button>
+        <button class="btn btn-next" onclick="skipToNextTrack()">⏭️ Next Track (ايندڙ گانو هلائي)</button>
     </div>
 
     <!-- Controls -->
@@ -114,6 +116,7 @@
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let activeTrackIndexGlobal = 0;
+    let currentPlaylistData = [];
 
     async function loadSettings() {
         const { data, error } = await _supabase.from('stream_config').select('*').eq('id', 1).single();
@@ -129,10 +132,9 @@
             document.getElementById('tickerText').value = data.ticker_text || '';
 
             activeTrackIndexGlobal = data.current_track_index || 0;
+            currentPlaylistData = (data.playlist && data.playlist.length > 0) ? data.playlist : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
 
-            const list = (data.playlist && data.playlist.length > 0) ? data.playlist : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
-
-            renderPlaylistItems(list);
+            renderPlaylistItems(currentPlaylistData);
             refreshDropdownList();
 
             document.getElementById('status').innerText = "Status: " + (data.is_live ? "🔴 LIVE BROADCASTING" : "⚪ STREAM OFF");
@@ -144,33 +146,33 @@
         const container = document.getElementById('playlistContainer');
         container.innerHTML = '';
         list.forEach((item, index) => {
-            addPlaylistItem(item.url, index === activeTrackIndexGlobal, index);
+            addPlaylistItem(item.url, index === activeTrackIndexGlobal);
         });
+        reindexPlaylistUI();
     }
 
-    function addPlaylistItem(url = '', isActive = false, index = null) {
+    function addPlaylistItem(url = '', isActive = false) {
         const container = document.getElementById('playlistContainer');
         const div = document.createElement('div');
         div.className = 'playlist-item';
-        
-        const trackIdx = (index !== null) ? index : container.children.length;
 
         div.innerHTML = `
-            <div class="badge-holder">${isActive ? '<span class="active-badge">▶ Playing Now</span>' : `<button class="btn-play" onclick="playSpecificTrack(${trackIdx})">▶ Switch Now</button>`}</div>
+            <div class="badge-holder">${isActive ? '<span class="active-badge">▶ Playing Now</span>' : `<button class="btn-play">▶ Switch Now</button>`}</div>
             <input type="text" class="song-url" value="${url}" placeholder="https://domain.com/video.mp4" oninput="refreshDropdownList()">
             <button class="btn-remove" onclick="removePlaylistItem(this)">X</button>
         `;
         container.appendChild(div);
+        reindexPlaylistUI();
         refreshDropdownList();
     }
 
     function removePlaylistItem(btn) {
         btn.parentElement.remove();
-        reindexPlaylist();
+        reindexPlaylistUI();
         refreshDropdownList();
     }
 
-    function reindexPlaylist() {
+    function reindexPlaylistUI() {
         const items = document.querySelectorAll('.playlist-item');
         items.forEach((item, index) => {
             const holder = item.querySelector('.badge-holder');
@@ -184,10 +186,6 @@
         });
     }
 
-    function updatePlayingBadges() {
-        reindexPlaylist();
-    }
-
     function refreshDropdownList() {
         const urlInputs = document.querySelectorAll('.song-url');
         const selectDropdown = document.getElementById('startTrackSelect');
@@ -197,15 +195,14 @@
             const url = input.value.trim();
             const option = document.createElement('option');
             option.value = index;
-            option.text = `Track ${index + 1}: ${url.substring(url.lastIndexOf('/') + 1) || 'Empty URL'}`;
+            option.text = `Track ${index + 1}: ${url.substring(url.lastIndexOf('/') + 1) || 'Empty Track'}`;
             if (index === activeTrackIndexGlobal) option.selected = true;
             selectDropdown.appendChild(option);
         });
     }
 
     async function onStartTrackChange(selectedIndex) {
-        activeTrackIndexGlobal = parseInt(selectedIndex);
-        updatePlayingBadges();
+        playSpecificTrack(parseInt(selectedIndex));
     }
 
     async function playSpecificTrack(index) {
@@ -231,8 +228,18 @@
             alert('Error switching track: ' + error.message);
         } else {
             activeTrackIndexGlobal = index;
-            updatePlayingBadges();
+            reindexPlaylistUI();
+            refreshDropdownList();
         }
+    }
+
+    async function skipToNextTrack() {
+        const urlInputs = document.querySelectorAll('.song-url');
+        const total = urlInputs.length;
+        if (total === 0) return;
+        
+        const nextIndex = (activeTrackIndexGlobal + 1) % total;
+        await playSpecificTrack(nextIndex);
     }
 
     async function saveSettings() {
@@ -305,7 +312,7 @@
         }
     }
 
-    // Realtime Sync Engine for Auto-play
+    // Realtime Sync Engine for Auto-play & Active Track Updates
     _supabase.channel('schema-db-changes')
         .on(
             'postgres_changes',
@@ -317,7 +324,7 @@
                     }
                     if (payload.new.current_track_index !== undefined && payload.new.current_track_index !== activeTrackIndexGlobal) {
                         activeTrackIndexGlobal = payload.new.current_track_index;
-                        updatePlayingBadges();
+                        reindexPlaylistUI();
                         refreshDropdownList();
                     }
                     document.getElementById('status').innerText = "Status: " + (payload.new.is_live ? "🔴 LIVE BROADCASTING" : "⚪ STREAM OFF");
