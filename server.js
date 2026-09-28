@@ -10,20 +10,16 @@ const PORT = process.env.PORT || 10000;
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://meywyyvqmrnpbzrzzhvm.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1leXd5eXZxbXJucGJ6cnp6aHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDM4Nzk2MiwiZXhwIjoyMTA1OTYzOTYyfQ.V3IuQuxRmK7npiS66RPn0SnYjnk7W2xo2pGvl_jWCtI';
 
-if (!SUPABASE_KEY) {
-  console.warn("⚠️ WARNING: SUPABASE_KEY is not defined in environment variables!");
-}
-
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY || '');
 
 let ffmpegProcess = null;
 let lastRestartTrigger = null;
 let currentConfig = null;
-let isSwitching = false;
+let isBusySwitching = false;
 
 const FONT_PATH = path.join(__dirname, 'sindhi.ttf');
 
-console.log("🚀 Live Studio Pro Ultra Engine Starting...");
+console.log("🚀 Live Studio Pro Engine Starting Realtime Loop...");
 
 function sanitizeText(text) {
   if (!text) return '';
@@ -33,86 +29,80 @@ function sanitizeText(text) {
     .replace(/:/g, '\\:');
 }
 
-async function checkDatabaseState() {
-  // جڏهن اڳ ئي وڊيو سوئچ يا ري-اسٽارٽ ٿي رهي هجي ته ڊيٽابيس لوپ کي روڪيو
-  if (isSwitching) return;
+// Supabase جنهن سيڪنڊ وڊيو ختم ٿيندي ترت نئين وڊيو ڏانهن شفٽ ڪندو
+async function handleNextTrackAuto() {
+  if (isBusySwitching) return;
+  isBusySwitching = true;
 
   try {
-    const { data: config, error } = await supabase
-      .from('stream_config')
-      .select('*')
-      .eq('id', 1)
-      .single();
+    const { data: config, error } = await supabase.from('stream_config').select('*').eq('id', 1).single();
+    if (error || !config || !config.is_live || !config.playlist || config.playlist.length === 0) {
+      isBusySwitching = false;
+      return;
+    }
 
+    const playlist = config.playlist;
+    const total = playlist.length;
+    let currentIdx = Number(config.current_track_index || 0);
+    
+    // اڳئين ٽريڪ ڏانهن واڌارو (Auto Move Next)
+    let nextIdx = (currentIdx + 1) % total;
+    let upcomingIdx = (nextIdx + 1) % total;
+
+    const autoNextText = `Track ${upcomingIdx + 1} of ${total}`;
+    const newTrigger = Date.now();
+    lastRestartTrigger = newTrigger;
+
+    console.log(`🎵 Auto-Transitioning: Index ${currentIdx} ➔ Index ${nextIdx}`);
+
+    // DB ۾ لائيِو اپڊيٽ
+    await supabase.from('stream_config').update({
+      current_track_index: nextIdx,
+      next_track: autoNextText,
+      restart_trigger: newTrigger
+    }).eq('id', 1);
+
+    config.current_track_index = nextIdx;
+    config.next_track = autoNextText;
+    config.restart_trigger = newTrigger;
+    currentConfig = config;
+
+    // FFmpeg چالو ڪريو
+    startBroadcaster(config);
+  } catch (err) {
+    console.error("Auto Switch Error:", err);
+  } finally {
+    setTimeout(() => { isBusySwitching = false; }, 2000);
+  }
+}
+
+async function checkDatabaseState() {
+  if (isBusySwitching) return;
+
+  try {
+    const { data: config, error } = await supabase.from('stream_config').select('*').eq('id', 1).single();
     if (error || !config) return;
 
     currentConfig = config;
 
-    // مانوئل سوئچ يا انڊيڪس چينج چيڪ
+    // مينوئل چينج چيڪ
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
-      console.log("🔄 Manual Switch / Config Changed Detected!");
+      console.log("🔄 Manual Track/Config Switch Triggered!");
       lastRestartTrigger = config.restart_trigger;
       startBroadcaster(config);
       return;
     }
 
     if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Live Signal OFF. Stopping Broadcaster...");
+      console.log("⏹️ Stream Signal OFF.");
       stopBroadcaster();
-    } else if (config.is_live && !ffmpegProcess && !isSwitching) {
-      console.log("▶️ Live Signal ON. Starting Stream Process...");
+    } else if (config.is_live && !ffmpegProcess && !isBusySwitching) {
+      console.log("▶️ Stream Signal ON.");
       if (config.restart_trigger) lastRestartTrigger = config.restart_trigger;
       startBroadcaster(config);
     }
   } catch (err) {
-    console.error("Database Loop Error:", err);
-  }
-}
-
-async function handleNextTrackAuto() {
-  if (isSwitching) return;
-  isSwitching = true;
-
-  try {
-    const { data: config } = await supabase.from('stream_config').select('*').eq('id', 1).single();
-    if (!config || !config.is_live || !config.playlist || config.playlist.length === 0) {
-      isSwitching = false;
-      return;
-    }
-
-    const totalTracks = config.playlist.length;
-    let currentIdx = (config.current_track_index !== undefined) ? config.current_track_index : 0;
-    let nextIndex = (currentIdx + 1) % totalTracks;
-    
-    const upcomingIndex = (nextIndex + 1) % totalTracks;
-    const autoNextTrackText = `Track ${upcomingIndex + 1} of ${totalTracks}`;
-
-    console.log(`🎵 Track Finished! Auto Switching to Track Index: ${nextIndex}`);
-
-    const newTrigger = Date.now();
-    lastRestartTrigger = newTrigger; // DB چيڪ ۾ دبل سوئچنگ کان بچاءُ لاءِ
-
-    await supabase.from('stream_config').update({
-      current_track_index: nextIndex,
-      next_track: autoNextTrackText,
-      restart_trigger: newTrigger
-    }).eq('id', 1);
-
-    config.current_track_index = nextIndex;
-    config.next_track = autoNextTrackText;
-    config.restart_trigger = newTrigger;
-    currentConfig = config;
-
-    // ترت نئين وڊيو FFmpeg ۾ لائيِو ڪيو
-    startBroadcaster(config);
-
-  } catch (err) {
-    console.error("Auto Switch Error:", err);
-  } finally {
-    // FFmpeg ري-اسٽارٽ لاءِ ننڍو Delay
-    setTimeout(() => {
-      isSwitching = false;
-    }, 1500);
+    console.error("Loop Check Error:", err);
   }
 }
 
@@ -123,7 +113,7 @@ function startBroadcaster(config) {
     ? config.playlist 
     : [{ url: 'https://ia600404.us.archive.org/25/items/mran_20260927_202609/mran.mp4' }];
 
-  let trackIndex = config.current_track_index || 0;
+  let trackIndex = Number(config.current_track_index || 0);
   if (trackIndex >= playlist.length) trackIndex = 0;
 
   const activeVideoUrl = playlist[trackIndex].url;
@@ -131,10 +121,7 @@ function startBroadcaster(config) {
   let fbKey = config.fb_key ? config.fb_key.trim() : '';
   let ytKey = config.yt_key ? config.yt_key.trim() : '';
 
-  if (!fbKey && !ytKey) {
-    console.log("⚠️ No Stream Key found. Cannot start stream.");
-    return;
-  }
+  if (!fbKey && !ytKey) return;
 
   let fbTarget = fbKey ? (fbKey.startsWith('rtmp') ? fbKey : `rtmps://live-api-s.facebook.com:443/rtmp/${fbKey}`) : '';
   let ytTarget = ytKey ? (ytKey.startsWith('rtmp') ? ytKey : `rtmp://a.rtmp.youtube.com/live2/${ytKey}`) : '';
@@ -166,12 +153,13 @@ function startBroadcaster(config) {
     videoFilter += `;[v1]null[outv]`;
   }
 
+  // اسٽريم فليگز کي RTMP ڪٽجڻ کان بچائڻ لاءِ فاست مڪمل رکيو ويو آهي
   let ffmpegArgs = [
     '-re',
     '-reconnect', '1',
     '-reconnect_at_eof', '1',
     '-reconnect_streamed', '1',
-    '-reconnect_delay_max', '5',
+    '-reconnect_delay_max', '10',
     '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     '-i', activeVideoUrl,
     '-i', logoUrl,
@@ -185,7 +173,7 @@ function startBroadcaster(config) {
     '-maxrate', '2500k',
     '-bufsize', '5000k',
     '-pix_fmt', 'yuv420p',
-    '-g', '60',
+    '-g', '30',
     '-c:a', 'aac',
     '-b:a', '128k',
     '-ar', '44100',
@@ -201,21 +189,21 @@ function startBroadcaster(config) {
   }
 
   try {
-    console.log(`▶️ Playing Track [Index: ${trackIndex}]: ${activeVideoUrl}`);
+    console.log(`▶ Stream Active Track Index [${trackIndex}]: ${activeVideoUrl}`);
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
     ffmpegProcess.on('close', (code) => {
-      console.log(`[FFmpeg Finished] Exit Code: ${code}`);
+      console.log(`[FFmpeg Finished Track] Exit Code: ${code}`);
       ffmpegProcess = null;
       
-      // وڊيو پوري ٿيڻ کان ترت پوءِ نئين وڊيو اٽو هلائي:
-      if (currentConfig && currentConfig.is_live && !isSwitching) {
+      // جڏهن گانو ختم ٿئي، بلا تاخير ترت handleNextTrackAuto هلائي!
+      if (currentConfig && currentConfig.is_live && !isBusySwitching) {
         handleNextTrackAuto();
       }
     });
 
     ffmpegProcess.stderr.on('data', (data) => {
-      // debug logs if needed
+      // debug logs
     });
 
   } catch (e) {
@@ -231,8 +219,7 @@ function stopBroadcaster() {
   }
 }
 
-// 2 سيڪنڊن جي چيڪ لوپ
-setInterval(checkDatabaseState, 2000);
+setInterval(checkDatabaseState, 1500);
 
 app.get('/', (req, res) => res.send('Engine Active'));
-app.listen(PORT, () => console.log(`Server Active on Port ${PORT}`));
+app.listen(PORT, () => console.log(`Server Listening on Port ${PORT}`));
