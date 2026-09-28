@@ -20,7 +20,7 @@ let isBusySwitching = false;
 
 const FONT_PATH = path.join(__dirname, 'sindhi.ttf');
 
-console.log("🚀 Live Studio Engine Started with 5-Second Early Auto-Switch Logic...");
+console.log("🚀 Live Studio Engine Started with 5-Second Early Auto-Switch Logic & Safe Crash Fix...");
 
 function sanitizeText(text) {
   if (!text) return '';
@@ -206,30 +206,38 @@ async function startBroadcaster(config) {
     console.log(`▶ Starting Track [Index ${trackIndex}]: ${activeVideoUrl}`);
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
-    // ۵ سيڪنڊ پهرين آٽو تبديلي جو ٽائيمر سيٽ ڪريو
-    const duration = await getVideoDuration(activeVideoUrl);
-    if (duration && duration > 10) {
-      const switchDelay = (duration - 5) * 1000; // ۵ سيڪنڊ اڳي
-      console.log(`⏱️ Track Duration: ${duration.toFixed(1)}s. Auto switch set for ${Math.round(switchDelay / 1000)}s.`);
-      
-      autoSwitchTimer = setTimeout(() => {
-        handleNextTrackAuto();
-      }, switchDelay);
+    if (ffmpegProcess) {
+      // ۵ سيڪنڊ پهرين آٽو تبديلي جو ٽائيمر سيٽ ڪريو
+      const duration = await getVideoDuration(activeVideoUrl);
+      if (duration && duration > 10) {
+        const switchDelay = (duration - 5) * 1000; // ۵ سيڪنڊ اڳي
+        console.log(`⏱️ Track Duration: ${duration.toFixed(1)}s. Auto switch set for ${Math.round(switchDelay / 1000)}s.`);
+        
+        autoSwitchTimer = setTimeout(() => {
+          handleNextTrackAuto();
+        }, switchDelay);
+      }
+
+      ffmpegProcess.on('close', (code) => {
+        console.log(`[FFmpeg Closed] Code: ${code}`);
+        ffmpegProcess = null;
+        if (autoSwitchTimer) clearTimeout(autoSwitchTimer);
+        
+        // ان حالت لاءِ جڏهن ٽائيمر سيٽ نه ٿي سگهيو هجي
+        if (currentConfig && currentConfig.is_live && !isBusySwitching) {
+          handleNextTrackAuto();
+        }
+      });
+
+      ffmpegProcess.on('error', (err) => {
+        console.error("Spawn Error (FFmpeg failed to start):", err.message);
+        ffmpegProcess = null;
+      });
     }
 
-    ffmpegProcess.on('close', (code) => {
-      console.log(`[FFmpeg Closed] Code: ${code}`);
-      ffmpegProcess = null;
-      if (autoSwitchTimer) clearTimeout(autoSwitchTimer);
-      
-      // ان حالت لاءِ جڏهن ٽائيمر سيٽ نه ٿي سگهيو هجي
-      if (currentConfig && currentConfig.is_live && !isBusySwitching) {
-        handleNextTrackAuto();
-      }
-    });
-
   } catch (e) {
-    console.error("Spawn Error:", e.message);
+    console.error("Spawn Error Catch:", e.message);
+    ffmpegProcess = null;
   }
 }
 
@@ -239,8 +247,10 @@ function stopBroadcaster() {
     autoSwitchTimer = null;
   }
   if (ffmpegProcess) {
-    ffmpegProcess.removeAllListeners('close');
-    ffmpegProcess.kill('SIGKILL');
+    try {
+      ffmpegProcess.removeAllListeners('close');
+      ffmpegProcess.kill('SIGKILL');
+    } catch (e) {}
     ffmpegProcess = null;
   }
 }
