@@ -34,6 +34,7 @@ function sanitizeText(text) {
 }
 
 async function checkDatabaseState() {
+  // جڏهن اڳ ئي وڊيو سوئچ يا ري-اسٽارٽ ٿي رهي هجي ته ڊيٽابيس لوپ کي روڪيو
   if (isSwitching) return;
 
   try {
@@ -47,20 +48,19 @@ async function checkDatabaseState() {
 
     currentConfig = config;
 
-    // مانوئل سوئچ يا پلي لسٽ اپڊيٽ جي صورت ۾
+    // مانوئل سوئچ يا انڊيڪس چينج چيڪ
     if (config.restart_trigger && config.restart_trigger !== lastRestartTrigger) {
+      console.log("🔄 Manual Switch / Config Changed Detected!");
       lastRestartTrigger = config.restart_trigger;
-      console.log("🔄 Manual Switch / Config Changed!");
       startBroadcaster(config);
       return;
     }
 
     if (!config.is_live && ffmpegProcess) {
-      console.log("⏹️ Live Signal OFF. Stopping...");
+      console.log("⏹️ Live Signal OFF. Stopping Broadcaster...");
       stopBroadcaster();
     } else if (config.is_live && !ffmpegProcess && !isSwitching) {
-      console.log("▶️ Live Signal ON. Starting Stream...");
-      // هتي lastRestartTrigger پهرين سيٽ ڪئي وئي آهي ته جيئن بار بار ريسٽارٽ نه ٿئي
+      console.log("▶️ Live Signal ON. Starting Stream Process...");
       if (config.restart_trigger) lastRestartTrigger = config.restart_trigger;
       startBroadcaster(config);
     }
@@ -81,15 +81,16 @@ async function handleNextTrackAuto() {
     }
 
     const totalTracks = config.playlist.length;
-    let nextIndex = ((config.current_track_index || 0) + 1) % totalTracks;
+    let currentIdx = (config.current_track_index !== undefined) ? config.current_track_index : 0;
+    let nextIndex = (currentIdx + 1) % totalTracks;
     
     const upcomingIndex = (nextIndex + 1) % totalTracks;
     const autoNextTrackText = `Track ${upcomingIndex + 1} of ${totalTracks}`;
 
-    console.log(`🎵 Video Ended! Seamless Switching to Track Index: ${nextIndex}`);
+    console.log(`🎵 Track Finished! Auto Switching to Track Index: ${nextIndex}`);
 
     const newTrigger = Date.now();
-    lastRestartTrigger = newTrigger;
+    lastRestartTrigger = newTrigger; // DB چيڪ ۾ دبل سوئچنگ کان بچاءُ لاءِ
 
     await supabase.from('stream_config').update({
       current_track_index: nextIndex,
@@ -102,12 +103,16 @@ async function handleNextTrackAuto() {
     config.restart_trigger = newTrigger;
     currentConfig = config;
 
+    // ترت نئين وڊيو FFmpeg ۾ لائيِو ڪيو
     startBroadcaster(config);
 
   } catch (err) {
     console.error("Auto Switch Error:", err);
   } finally {
-    isSwitching = false;
+    // FFmpeg ري-اسٽارٽ لاءِ ننڍو Delay
+    setTimeout(() => {
+      isSwitching = false;
+    }, 1500);
   }
 }
 
@@ -126,7 +131,10 @@ function startBroadcaster(config) {
   let fbKey = config.fb_key ? config.fb_key.trim() : '';
   let ytKey = config.yt_key ? config.yt_key.trim() : '';
 
-  if (!fbKey && !ytKey) return;
+  if (!fbKey && !ytKey) {
+    console.log("⚠️ No Stream Key found. Cannot start stream.");
+    return;
+  }
 
   let fbTarget = fbKey ? (fbKey.startsWith('rtmp') ? fbKey : `rtmps://live-api-s.facebook.com:443/rtmp/${fbKey}`) : '';
   let ytTarget = ytKey ? (ytKey.startsWith('rtmp') ? ytKey : `rtmp://a.rtmp.youtube.com/live2/${ytKey}`) : '';
@@ -163,7 +171,7 @@ function startBroadcaster(config) {
     '-reconnect', '1',
     '-reconnect_at_eof', '1',
     '-reconnect_streamed', '1',
-    '-reconnect_delay_max', '2',
+    '-reconnect_delay_max', '5',
     '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     '-i', activeVideoUrl,
     '-i', logoUrl,
@@ -184,7 +192,6 @@ function startBroadcaster(config) {
     '-ac', '2'
   ];
 
-  // Tee Muxer استعمال ڪري ٻنهي سرورن ڏانهن ايمبيڊڊ اسٽريمنگ
   let targets = [];
   if (fbTarget) targets.push(`[f=flv:onfail=ignore]${fbTarget}`);
   if (ytTarget) targets.push(`[f=flv:onfail=ignore]${ytTarget}`);
@@ -198,16 +205,17 @@ function startBroadcaster(config) {
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
     ffmpegProcess.on('close', (code) => {
-      console.log(`[FFmpeg Track Finished] Exit Code: ${code}`);
+      console.log(`[FFmpeg Finished] Exit Code: ${code}`);
       ffmpegProcess = null;
       
+      // وڊيو پوري ٿيڻ کان ترت پوءِ نئين وڊيو اٽو هلائي:
       if (currentConfig && currentConfig.is_live && !isSwitching) {
         handleNextTrackAuto();
       }
     });
 
     ffmpegProcess.stderr.on('data', (data) => {
-      // console.log(`FFmpeg Log: ${data.toString()}`);
+      // debug logs if needed
     });
 
   } catch (e) {
@@ -223,6 +231,7 @@ function stopBroadcaster() {
   }
 }
 
+// 2 سيڪنڊن جي چيڪ لوپ
 setInterval(checkDatabaseState, 2000);
 
 app.get('/', (req, res) => res.send('Engine Active'));
